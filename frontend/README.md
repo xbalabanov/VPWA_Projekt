@@ -1,36 +1,41 @@
 # VPWA Chat (frontend)
 
+Requires Node.js 22.12+ or 24+. We use **npm** (see `package-lock.json`), run all commands inside `frontend/`.
+
 ## Install the dependencies
 
 ```bash
-pnpm install
-# or: yarn/npm/bun install
+npm install
 ```
 
 ### Start the app in development mode (HMR, error reporting, etc.)
 
 ```bash
-quasar dev
+npm run dev
 ```
 
 ### Format & Lint the files
 
 ```bash
-pnpm run lint
-# or: yarn/npm/bun run lint
+npm run lint
 ```
 
 ...or just check formatting & linting:
 
 ```bash
-pnpm run lint:check
-# or: yarn/npm/bun run lint:check
+npm run lint:check
+```
+
+### Type-check
+
+```bash
+npm run typecheck
 ```
 
 ### Build the app for production
 
 ```bash
-quasar build
+npm run build
 ```
 
 ### Customize the configuration
