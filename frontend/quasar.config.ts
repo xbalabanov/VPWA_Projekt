@@ -99,7 +99,9 @@ export default defineConfig((/* ctx */) => {
       // directives: [],
 
       // Quasar plugins
-      plugins: [],
+      // AppVisibility - is the app visible? (UC8: notify only when hidden)
+      // Notify - in-app toast messages, Dialog - confirm/prompt windows
+      plugins: ['AppVisibility', 'Notify', 'Dialog'],
     },
 
     // animations: 'all', // --- includes all animations

@@ -1,0 +1,8 @@
+# Store text files with LF line endings and check them out as LF on every OS,
+# so Prettier/.editorconfig (end_of_line = lf) do not fight with Windows CRLF.
+* text=auto eol=lf
+
+# Binary files: never touch line endings
+*.png binary
+*.ico binary
+*.jpg binary
