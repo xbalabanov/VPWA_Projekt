@@ -25,7 +25,7 @@ export default defineConfig((/* ctx */) => {
       // 'themify',
       // 'line-awesome',
 
-      'roboto-font', // optional, you are not bound to it
+      // 'roboto-font' nepoužívame: písmo je systémové (--font-ui v app.scss)
       'material-icons', // optional, you are not bound to it
     ],
 
@@ -46,6 +46,11 @@ export default defineConfig((/* ctx */) => {
       // filenameBasedRouting: true,
 
       vueRouterMode: 'hash', // available values: 'hash', 'history'
+
+      // Projekt používa Vue Options API (pozri README). Quasar ho štandardne vypína,
+      // potom by sa data/computed/methods komponentov ticho ignorovali.
+      // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#build
+      vueOptionsAPI: true,
       // vueRouterBase,
 
       // publicPath: '/',
@@ -86,7 +91,11 @@ export default defineConfig((/* ctx */) => {
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#framework
     framework: {
-      config: {},
+      config: {
+        // Tmavý režim podľa nastavenia systému; používateľ ho môže prepnúť v hlavičke.
+        // https://v2.quasar.dev/quasar-plugins/dark
+        dark: 'auto',
+      },
 
       // iconSet: 'material-icons', // Quasar icon set
       // lang: 'en-US', // Quasar language pack
