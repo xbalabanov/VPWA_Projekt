@@ -45,6 +45,11 @@ export default defineConfig((/* ctx */) => {
       // https://v2.quasar.dev/quasar-cli-vite/page-routing-with-vue-router#filename-based-routing
       // filenameBasedRouting: true,
 
+      // Quasar turns Options API support OFF by default (__VUE_OPTIONS_API__ = false), which
+      // makes Vue ignore data()/methods/computed. We write all components in Options API.
+      // https://quasar.dev/quasar-cli-vite/quasar-config-file#property-build
+      vueOptionsAPI: true,
+
       vueRouterMode: 'hash', // available values: 'hash', 'history'
       // vueRouterBase,
 

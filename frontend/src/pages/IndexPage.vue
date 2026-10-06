@@ -8,6 +8,7 @@
       />
 
       <q-btn class="q-mt-md" color="primary" to="/second" label="Go to Second Page" no-caps />
+      <q-btn class="q-mt-md" color="primary" to="/login" label="LOGIN" no-caps />
     </div>
   </q-page>
 </template>

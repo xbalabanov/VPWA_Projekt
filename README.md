@@ -152,6 +152,25 @@ Bez akceptovanej 1. fázy nie je možné odovzdať 2. fázu.
 
 Entity, ktoré zadanie implicitne vyžaduje (východiskový zoznam pre návrh, nie hotová schéma): používateľ (meno, priezvisko, `nickName`, email, stav, nastavenie notifikácií), kanál (`channelName`, typ, správca, čas poslednej aktivity), členstvo v kanáli (vrátane stavu pozvánky/banu), hlasy za `/kick`, správa (autor, kanál, text, čas, adresáti cez `@nickname`).
 
+## Priebeh prác (stav k 7. 10. 2026)
+
+**UC 1 (registrácia/prihlásenie): rozpracované.**
+
+- Hotové: `src/layouts/AuthLayout.vue`, `src/pages/LoginPage.vue` (formulár email + heslo s validáciou cez `rules`) a route `/login` v `src/router/routes.ts`.
+- Chýba: `auth` store (`register`, `login`, `logout`, kontrola unikátneho `nickName` a emailu), `RegisterPage.vue` + route `/register`, mock používatelia, route guard (neprihlásený ⇒ `/login`), tlačidlo odhlásenia v `MainLayout`, odkaz na prihlásenie z aplikácie. Prihlásenie zatiaľ len vypíše notifikáciu, nič sa neukladá.
+
+**Čo sme sa naučili (dôležité pre tím):**
+
+- **Options API treba v Quasare zapnúť.** Quasar má `vueOptionsAPI: false` ako predvolenú hodnotu, takže Vue ignoruje `data()`, `methods` aj `computed`. Prejavilo sa to tak, že text v `q-input` po kliknutí mimo poľa "vrátil" starú hodnotu a v konzole bolo `Property "email" was accessed during render but is not defined on instance`. Oprava je `build.vueOptionsAPI: true` v `quasar.config.ts` (už pridané). Po `git pull` treba reštartovať `npm run dev`.
+- **Importy cez alias `@/`**, napr. `import('@/pages/LoginPage.vue')`. Aliasy `pages/...` a `layouts/...` v tomto projekte nefungujú.
+- **PowerShell blokuje `npm`** (execution policy). Riešenie: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`, alebo `npm.cmd run dev`.
+- Pri spustení dvoch dev serverov sa druhý presunie na port 9001. Staršie nechaj zatvoriť, nech nebežia dva naraz.
+- Súbor `complete_task.md` (úplné zadanie z repozitára predmetu) je v `.gitignore` a necommituje sa.
+
+**Ďalšie kroky:** pozri `memory/roadmap.md` (UML diagram, mock dáta, prázdne stores, layout shell) a dokončiť UC 1. Termín 1. fázy je 18. 10. 2026.
+
+**Necommitnuté zmeny:** `quasar.config.ts`, `src/router/routes.ts`, `src/layouts/AuthLayout.vue`, `src/pages/LoginPage.vue`, `.gitignore`, `README.md`. Pred commitom skontroluj `frontend/package-lock.json` (zmenil sa po `npm install`).
+
 ## Otvorené otázky (zadanie ich neurčuje, treba rozhodnúť v tíme)
 
 - Môže sa používateľ cez `/join channelName` pridať do **existujúceho súkromného** kanála bez pozvánky? (Pravdepodobne nie.)
