@@ -1,0 +1,64 @@
+Create a UML class diagram of a logical relational data model for a Slack/IRC-style chat app.  Show each class with its attributes and types, mark primary keys (PK), foreign keys (FK) and unique attributes, and draw 
+  associations with multiplicities.
+  Classes:
+
+  User
+  - id: int (PK)
+  - firstName: string
+  - lastName: string
+  - nickName: string (unique)
+  - email: string (unique)
+  - status: UserStatus
+  - notifyMentionsOnly: boolean
+
+  UserStatus (enumeration): online, dnd, offline
+
+  Channel
+  - id: int (PK)
+  - name: string (unique)
+  - isPrivate: boolean
+  - adminId: int (FK → User.id)
+  - lastActivityAt: datetime
+
+  ChannelMember
+  - userId: int (PK, FK → User.id)
+  - channelId: int (PK, FK → Channel.id)
+  - joinedAt: datetime
+
+  Invitation
+  - id: int (PK)
+  - channelId: int (FK → Channel.id)
+  - invitedUserId: int (FK → User.id)
+  - invitedById: int (FK → User.id)
+  - createdAt: datetime
+
+  KickVote
+  - channelId: int (PK, FK → Channel.id)
+  - targetUserId: int (PK, FK → User.id)
+  - voterId: int (PK, FK → User.id)
+
+  Ban
+  - channelId: int (PK, FK → Channel.id)
+  - userId: int (PK, FK → User.id)
+
+  Message
+  - id: int (PK)
+  - channelId: int (FK → Channel.id)
+  - authorId: int (FK → User.id)
+  - content: text
+  - createdAt: datetime
+
+  Mention
+  - messageId: int (PK, FK → Message.id)
+  - userId: int (PK, FK → User.id)
+
+  Associations (with multiplicities):
+  - User 1 — 0..* Channel (a user administers channels; each channel has exactly 1 admin)
+  - User 1 — 0..* ChannelMember, Channel 1 — 0..* ChannelMember (users are members of many channels, channels have many members)
+  - Channel 1 — 0..* Invitation; User 1 — 0..* Invitation (as invited user); User 1 — 0..* Invitation (as inviter)
+  - Channel 1 — 0..* KickVote; User 1 — 0..* KickVote (as target); User 1 — 0..* KickVote (as voter)
+  - Channel 1 — 0..* Ban; User 1 — 0..* Ban
+  - Channel 1 — 0..* Message (deleting a channel deletes its messages)
+  - User 1 — 0..* Message (as author)
+  - Message 1 — 0..* Mention; User 1 — 0..* Mention
+  - User — UserStatus (each user has one status)
