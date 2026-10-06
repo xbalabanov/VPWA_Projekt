@@ -1,1 +1,109 @@
 // app global css
+//
+// Design tokens (farby, typografia) pre celú aplikáciu. Komponenty používajú iba
+// tieto premenné, nikdy priamo farby, aby svetlý aj tmavý režim fungovali všade.
+// Tmavý režim prepína Quasar Dark plugin: pridá triedu .body--dark na <body>.
+// https://v2.quasar.dev/quasar-plugins/dark
+//
+// Farby sú v OKLCH (svetlosť, sýtosť, odtieň), aby sa ľahko ladili dvojice
+// svetlá/tmavá a kontrast textu (WCAG AA). https://oklch.com
+// Neutrálne farby sú jemne zafarbené do odtieňa akcentu (160 = zelená).
+
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+
+  --bg: oklch(0.985 0.003 160); // plocha so správami
+  --sidebar: oklch(0.96 0.006 160); // bočné panely
+  --surface: oklch(0.995 0.002 160); // vstupné pole, karty
+  --hover: oklch(0.925 0.008 160);
+  --border: oklch(0.89 0.008 160);
+
+  --text: oklch(0.24 0.015 160);
+  --text-muted: oklch(0.47 0.015 160); // kontrast ~6:1 na --bg
+  --text-subtle: oklch(0.54 0.012 160); // kontrast ~4.6:1 na --bg (AA)
+
+  --accent: oklch(0.5 0.1 160); // aktívny kanál, primárne akcie, online
+  --accent-soft: oklch(0.92 0.04 160);
+  --on-accent: oklch(0.99 0.005 160);
+
+  --invite: oklch(0.5 0.13 250); // pozvánka do kanála
+  --invite-soft: oklch(0.93 0.035 250);
+
+  --mention-bg: oklch(0.95 0.05 85); // správa adresovaná mne (@nickname)
+  --mention-text: oklch(0.45 0.1 70);
+
+  --online: oklch(0.6 0.13 155);
+  --dnd: oklch(0.62 0.17 35);
+  --offline: oklch(0.7 0.01 160);
+
+  --focus: oklch(0.55 0.12 160);
+
+  // Quasar komponenty (color="primary", tmavé panely) čítajú tieto premenné.
+  --q-primary: var(--accent);
+}
+
+body.body--dark {
+  --bg: oklch(0.2 0.008 160);
+  --sidebar: oklch(0.17 0.008 160);
+  --surface: oklch(0.24 0.009 160);
+  --hover: oklch(0.27 0.01 160);
+  --border: oklch(0.31 0.01 160);
+
+  --text: oklch(0.93 0.008 160);
+  --text-muted: oklch(0.76 0.01 160);
+  --text-subtle: oklch(0.66 0.01 160);
+
+  --accent: oklch(0.74 0.11 160);
+  --accent-soft: oklch(0.3 0.04 160);
+  --on-accent: oklch(0.18 0.02 160);
+
+  --invite: oklch(0.76 0.1 250);
+  --invite-soft: oklch(0.3 0.05 250);
+
+  --mention-bg: oklch(0.3 0.05 80);
+  --mention-text: oklch(0.85 0.1 85);
+
+  --online: oklch(0.72 0.14 155);
+  --dnd: oklch(0.7 0.16 35);
+  --offline: oklch(0.55 0.01 160);
+
+  --focus: oklch(0.74 0.11 160);
+
+  --q-dark: var(--sidebar);
+  --q-dark-page: var(--bg);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+// Viditeľný fokus pre klávesnicu (WCAG 2.4.7), myš ho nezobrazuje.
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+// Avatar s farbou odvodenou od id používateľa (premenná --hue v style atribúte).
+.user-avatar {
+  background: oklch(0.88 0.06 var(--hue));
+  color: oklch(0.34 0.08 var(--hue));
+  font-weight: 600;
+}
+
+body.body--dark .user-avatar {
+  background: oklch(0.4 0.07 var(--hue));
+  color: oklch(0.93 0.04 var(--hue));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
