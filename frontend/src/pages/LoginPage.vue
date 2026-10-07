@@ -1,16 +1,20 @@
 <template>
-  <q-page class="flex flex-center">
-    <q-form @submit="onSubmit" class="q-gutter-md" style="width: 320px">
+  <section>
+    <h1 class="auth-title">Log in</h1>
+    <p class="auth-subtitle">Welcome back. Your channels are waiting.</p>
+
+    <q-form @submit="onSubmit" class="q-gutter-md">
       <q-input
         v-model="email"
         label="Email"
         type="email"
         outlined
-        :rules="[(val) => !!val || 'Zadaj email', (val) => val.includes('@') || 'Email musi obsahovat @']"
+        :rules="[
+          (val) => !!val || 'Zadaj email',
+          (val) => val.includes('@') || 'Email musi obsahovat @',
+        ]"
       />
 
-    <p>Email v data: "{{ email }}"</p>
-    
       <q-input
         v-model="password"
         label="Heslo"
@@ -19,9 +23,11 @@
         :rules="[(val) => val.length >= 6 || 'Aspoň 6 znakov']"
       />
 
-      <q-btn label="Prihlásiť" type="submit" color="primary" />
+      <q-btn unelevated no-caps class="auth-submit" label="Log in" type="submit" />
     </q-form>
-  </q-page>
+
+    <p class="auth-switch">New here? <router-link to="/register">Create an account</router-link></p>
+  </section>
 </template>
 
 <script lang="ts">
@@ -39,8 +45,9 @@ export default defineComponent({
 
   methods: {
     onSubmit() {
-      console.log('Formulár je platný', this.email);
-      this.$q.notify({ message: 'Prihlásený', color: 'positive' })
+      // Zatiaľ bez auth store (UC 1): len notifikácia a presun do chatu.
+      this.$q.notify({ message: 'Prihlásený', color: 'positive' });
+      void this.$router.push('/');
     },
   },
 });
