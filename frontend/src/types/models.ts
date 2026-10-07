@@ -18,6 +18,8 @@ export interface User {
   email: string; // unique
   status: UserStatus;
   notifyMentionsOnly: boolean;
+
+  password: string;
 }
 
 export interface Channel {

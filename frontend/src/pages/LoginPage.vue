@@ -32,6 +32,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue';
+import { useUsersStore } from '../stores/users';
 
 export default defineComponent({
   name: 'LoginPage',
@@ -45,7 +46,11 @@ export default defineComponent({
 
   methods: {
     onSubmit() {
-      // Zatiaľ bez auth store (UC 1): len notifikácia a presun do chatu.
+      const ok = useUsersStore().login(this.email, this.password);
+      if (!ok) {
+        this.$q.notify({ message: 'Invalid name or password', color: 'negative' });
+        return;
+      }
       this.$q.notify({ message: 'Prihlásený', color: 'positive' });
       void this.$router.push('/');
     },
