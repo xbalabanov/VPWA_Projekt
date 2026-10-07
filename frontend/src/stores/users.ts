@@ -6,7 +6,7 @@ import type { User } from '../types/models';
 
 interface UsersState {
   users: User[];
-  currentUserId: number; // prihlásený používateľ (v prototype pevne 1)
+  currentUserId: number | null; // prihlásený používateľ, null -> nikto nie je prihlásený
 }
 
 export const useUsersStore = defineStore('users', {
@@ -21,6 +21,7 @@ export const useUsersStore = defineStore('users', {
         email: 'ed@example.com',
         status: 'online',
         notifyMentionsOnly: false,
+        password: '123456',
       },
       {
         id: 2,
@@ -30,6 +31,7 @@ export const useUsersStore = defineStore('users', {
         email: 'jana@example.com',
         status: 'dnd',
         notifyMentionsOnly: false,
+        password: '123456',
       },
       {
         id: 3,
@@ -39,6 +41,7 @@ export const useUsersStore = defineStore('users', {
         email: 'peter@example.com',
         status: 'offline',
         notifyMentionsOnly: false,
+        password: '123456',
       },
       {
         id: 4,
@@ -48,6 +51,7 @@ export const useUsersStore = defineStore('users', {
         email: 'maria@example.com',
         status: 'online',
         notifyMentionsOnly: true,
+        password: '123456',
       },
       {
         id: 5,
@@ -57,18 +61,35 @@ export const useUsersStore = defineStore('users', {
         email: 'tomas@example.com',
         status: 'online',
         notifyMentionsOnly: false,
+        password: '123456',
       },
     ],
-    currentUserId: 1,
+    currentUserId: null,
   }),
 
   getters: {
     currentUser: (state): User | undefined => state.users.find((u) => u.id === state.currentUserId),
+
+    isLoggedIn: (state): boolean => state.currentUserId !== null,
 
     // Použitie: usersStore.userById(2)
     userById:
       (state) =>
       (id: number): User | undefined =>
         state.users.find((u) => u.id === id),
+  },
+
+  actions: {
+    // Vráti true pri úspechu, aby LoginPage vedela, či má presmerovať alebo ukázať chybu.
+    login(email: string, password: string): boolean {
+      const user = this.users.find((u) => u.email === email && u.password === password);
+      if (!user) return false;
+      this.currentUserId = user.id;
+      return true;
+    },
+
+    logout(): void {
+      this.currentUserId = null;
+    },
   },
 });

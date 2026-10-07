@@ -8,6 +8,8 @@ import {
 
 import routes from './routes';
 
+import { useUsersStore } from '@/stores/users';
+
 /*
  * If not building with SSR mode, you can
  * directly export the Router instantiation;
@@ -32,6 +34,15 @@ export default defineRouter((/* { store, ssrContext } */) => {
     // quasar.conf.js -> build -> vueRouterMode
     // quasar.conf.js -> build -> publicPath
     history: createHistory(import.meta.env.QUASAR_VUE_ROUTER_BASE),
+  });
+
+  //neprihlaseny pouzivatel sa nedostane na chranene stranky
+  // https://router.vuejs.org/guide/advanced/navigation-guards.html
+  Router.beforeEach((to) => {
+    const usersStore = useUsersStore();
+    if (to.meta.requiresAuth && !usersStore.isLoggedIn) return '/login';
+    //prihlaseny nema dovod ist na login/register
+    if ((to.path === '/login' || to.path === '/register') && usersStore.isLoggedIn) return '/';
   });
 
   return Router;

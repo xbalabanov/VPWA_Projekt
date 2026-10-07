@@ -139,6 +139,7 @@ export default defineComponent({
     },
 
     logout(): void {
+      this.usersStore.logout();
       void this.$router.push('/login');
     },
   },
