@@ -24,12 +24,12 @@
       <li v-else-if="!hasMore" class="history-status">
         This is the start of #{{ channelsStore.activeChannel.name }}
       </li>
-      <MessageItem
-        v-for="(message, index) in channelMessages"
-        :key="message.id"
-        :message="message"
-        :compact="isContinuation(index)"
-      />
+      <template v-for="(message, index) in channelMessages" :key="message.id">
+        <li v-if="startsNewDay(index)" class="day-divider">
+          <span>{{ dayLabel(message.createdAt) }}</span>
+        </li>
+        <MessageItem :message="message" :compact="isContinuation(index)" />
+      </template>
     </ol>
   </div>
 </template>
@@ -44,6 +44,23 @@ import MessageItem from './MessageItem.vue';
 
 // Správy toho istého autora do 5 minút od seba spojíme do jednej skupiny.
 const GROUP_GAP_MS = 5 * 60 * 1000;
+
+// Sú dva dátumy v ten istý kalendárny deň (v miestnom čase)?
+function isSameDay(a: Date, b: Date): boolean {
+  return a.toDateString() === b.toDateString();
+}
+
+// Text oddeľovača dní: "Today", "Yesterday" alebo napr. "Thursday, 1 October".
+function dayLabel(createdAt: string): string {
+  const date = new Date(createdAt);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (isSameDay(date, today)) return 'Today';
+  if (isSameDay(date, yesterday)) return 'Yesterday';
+  return date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+}
 
 export default defineComponent({
   name: 'MessageList',
@@ -128,7 +145,20 @@ export default defineComponent({
       if (!current || !previous) return false;
 
       const gap = new Date(current.createdAt).getTime() - new Date(previous.createdAt).getTime();
-      return current.authorId === previous.authorId && gap < GROUP_GAP_MS;
+      return (
+        current.authorId === previous.authorId && gap < GROUP_GAP_MS && !this.startsNewDay(index)
+      );
+    },
+
+    dayLabel,
+
+    // Začína správa na pozícii `index` nový deň? (prvá načítaná správa vždy áno)
+    startsNewDay(index: number): boolean {
+      const current = this.channelMessages[index];
+      const previous = this.channelMessages[index - 1];
+      if (!current) return false;
+      if (!previous) return true;
+      return !isSameDay(new Date(current.createdAt), new Date(previous.createdAt));
     },
   },
 });
@@ -176,6 +206,23 @@ export default defineComponent({
   color: var(--text);
   font-size: 1rem;
   font-weight: 650;
+}
+
+/* Oddeľovač dní: text v strede, čiara naľavo aj napravo. */
+.day-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 4px;
+  color: var(--text-subtle);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.day-divider::before,
+.day-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border);
 }
 
 @media (max-width: 599px) {
