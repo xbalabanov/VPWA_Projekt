@@ -1,5 +1,5 @@
 <!-- Zoznam členov aktívneho kanála (UC 10).
-     Vlastník: Maksym (A6), review: Stanislav. -->
+     Vlastník: Stanislav (A6). -->
 <template>
   <section aria-label="Members">
     <div class="section-label">Members</div>

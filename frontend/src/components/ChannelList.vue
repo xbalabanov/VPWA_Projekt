@@ -1,5 +1,5 @@
 <!-- Zoznam kanálov prihláseného používateľa (UC 2).
-     Vlastník: Maksym (A2, A3), review: Stanislav. -->
+     Vlastník: Stanislav (A2, A3). -->
 <template>
   <q-list>
     <q-item
