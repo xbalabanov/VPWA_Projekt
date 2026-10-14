@@ -92,4 +92,12 @@ export default defineComponent({
 .auth-panel :deep(.auth-switch a:hover) {
   text-decoration: underline;
 }
+/* Chrome prefarbí automaticky vyplnené polia (uložený email/heslo) na žlto.
+   Prekryjeme to farbou panelu, aby to sedelo aj v tmavom režime.
+   Zdroj: https://developer.mozilla.org/en-US/docs/Web/CSS/:autofill */
+.auth-panel :deep(input:-webkit-autofill) {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+}
 </style>
