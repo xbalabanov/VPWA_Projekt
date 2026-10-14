@@ -1,7 +1,7 @@
 <!-- Jedna správa v zozname (UC 7).
      Vlastník: Maksym (B2). -->
 <template>
-  <li class="message" :class="{ 'message--compact': compact }">
+  <li class="message" :class="{ 'message--compact': compact, 'message--own': isOwn }">
     <q-avatar
       v-if="!compact"
       size="36px"
@@ -69,6 +69,11 @@ export default defineComponent({
         minute: '2-digit',
       });
     },
+
+    // Napísal správu prihlásený používateľ?
+    isOwn(): boolean {
+      return this.message.authorId === this.usersStore.currentUserId;
+    },
   },
 
   methods: {
@@ -81,8 +86,8 @@ export default defineComponent({
 .message {
   display: flex;
   gap: 12px;
-  margin-top: 14px;
-  padding: 6px 8px 2px;
+  margin-top: 16px;
+  padding: 6px 8px 3px;
   border-radius: 8px;
 }
 .message-body {
@@ -103,7 +108,7 @@ export default defineComponent({
 }
 .message-text {
   max-width: 72ch;
-  margin: 1px 0 3px;
+  margin: 0;
   font-size: 0.9375rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -112,7 +117,8 @@ export default defineComponent({
 /* Pokračovanie skupiny: tesne pod predošlou správou. */
 .message--compact {
   margin-top: 0;
-  padding-top: 2px;
+  padding-top: 1px;
+  padding-bottom: 1px;
 }
 .message:hover {
   background: var(--surface);
@@ -122,7 +128,7 @@ export default defineComponent({
 .message-gutter-time {
   width: 36px;
   flex-shrink: 0;
-  padding-top: 4px;
+  padding-top: 3px;
   color: var(--text-subtle);
   font-size: 0.6875rem;
   text-align: center;
@@ -130,6 +136,16 @@ export default defineComponent({
 }
 .message:hover .message-gutter-time {
   visibility: visible;
+}
+
+/* Moje správy: jemné pozadie a pásik vľavo. */
+.message--own {
+  border-radius: 0;
+  background: color-mix(in oklch, var(--accent-soft) 30%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.message--own:hover {
+  background: var(--accent-soft);
 }
 
 @media (max-width: 599px) {
