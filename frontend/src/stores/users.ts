@@ -77,15 +77,53 @@ export const useUsersStore = defineStore('users', {
       (state) =>
       (id: number): User | undefined =>
         state.users.find((u) => u.id === id),
+
+    // Unikátnosť bez ohľadu na veľké/malé písmená (Jana = jana).
+    // RegisterPage ich volá v :rules, aby chyba bola vidno hneď pri písaní.
+    isEmailTaken:
+      (state) =>
+      (email: string): boolean =>
+        state.users.some((u) => u.email.toLowerCase() === email.trim().toLowerCase()),
+
+    isNickNameTaken:
+      (state) =>
+      (nickName: string): boolean =>
+        state.users.some((u) => u.nickName.toLowerCase() === nickName.toLowerCase()),
   },
 
   actions: {
     // Vráti true pri úspechu, aby LoginPage vedela, či má presmerovať alebo ukázať chybu.
     login(email: string, password: string): boolean {
-      const user = this.users.find((u) => u.email === email && u.password === password);
+      const user = this.users.find(
+        (u) => u.email === email.trim().toLowerCase() && u.password === password,
+      );
       if (!user) return false;
       this.currentUserId = user.id;
       return true;
+    },
+
+    register(data: {
+      firstName: string;
+      lastName: string;
+      nickName: string;
+      email: string;
+      password: string;
+    }): string | null {
+      //email a nickname musia byt unikat (formular to kontroluje tiez, toto je poistka)
+      if (this.isEmailTaken(data.email)) return 'Email je už použitý';
+      if (this.isNickNameTaken(data.nickName)) return 'NickName je už obsadený';
+      const email = data.email.trim().toLowerCase();
+
+      //nové id = najvacsie + 1 nez spravime databazu
+      const id = Math.max(0, ...this.users.map((u) => u.id)) + 1;
+
+      // ...data skopiruje vsetky polia z formulara, zvysok doplnime
+      // email ulozime malymi pismenami, aby login fungoval aj pri inom pisani
+      this.users.push({ ...data, email, id, status: 'online', notifyMentionsOnly: false });
+
+      //po registracii rovno prihlasime
+      this.currentUserId = id;
+      return null;
     },
 
     logout(): void {
