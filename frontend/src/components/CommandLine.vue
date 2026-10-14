@@ -1,5 +1,5 @@
 <!-- Príkazový riadok: odoslanie správy alebo príkazu (UC 3).
-     Vlastník: Stanislav (B1), review: Maksym.
+     Vlastník: Maksym (B1).
      Príkazy rozpozná utils/commandParser.ts. -->
 <template>
   <div class="command-line">

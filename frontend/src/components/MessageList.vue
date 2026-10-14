@@ -1,5 +1,5 @@
 <!-- Správy aktívneho kanála, najnovšie dole (UC 7).
-     Vlastník: Stanislav (B2), review: Maksym.
+     Vlastník: Maksym (B2).
      Má vlastný posuvník (nie celé okno), aby sa naň dal neskôr napojiť infinite scroll. -->
 <template>
   <div ref="scroller" class="chat-scroll">

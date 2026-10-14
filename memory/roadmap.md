@@ -128,3 +128,125 @@ Zodpovednosť za:
 Druhý člen nemení channel store priamo, ale používa jeho actions.
 
 ⸻
+
+Maksym – správy, prítomnosť a realtime
+
+B1 – CommandLine
+
+Implementovať:
+
+* fixný CommandLine v MainLayout
+* odoslanie obyčajnej správy
+* odoslanie príkazu
+* napojenie na existujúci parser
+* zobrazenie parser error
+* správne správanie podľa aktívneho kanála
+
+UC: 3
+
+⸻
+
+B2 – História správ
+
+Implementovať:
+
+* MessageList
+* MessageItem
+* zobrazovanie správ
+* stránkové načítavanie mock dát
+* infinite scroll
+* správne radenie správ
+
+Architektúra má zostať pripravená na neskoršie API/WebSocket riešenie.
+
+UC: 7
+
+⸻
+
+B3 – @nickname
+
+Implementovať:
+
+* rozpoznanie @nickname
+* isMentioned
+* zvýraznenie správy adresátovi
+* zachovanie informácie o adresátovi pre neskoršie notifikácie
+
+UC: 6
+
+⸻
+
+B4 – Typing indicator
+
+Implementovať:
+
+* "X is typing"
+* zobrazenie nickName
+* kliknutie na nickName
+* dialóg s rozpísaným textom
+* aktualizáciu rozpísaného textu v reálnom čase
+
+Nestačí iba boolean isTyping; prototyp má reprezentovať aj samotný draft.
+
+UC: 11
+
+⸻
+
+B5 – Stav používateľa
+
+Implementovať:
+
+* online
+* DND
+* offline
+* menu na zmenu stavu
+* zobrazovanie stavu ostatným používateľom
+
+Pravidlá:
+
+* DND → bez notifikácií
+* offline → používateľovi neprichádzajú správy
+* po návrate online → kanály sa aktualizujú z histórie
+
+UC: 9
+
+⸻
+
+B6 – Notifikácie
+
+Implementovať:
+
+* Quasar App Visibility
+* notifikáciu iba keď aplikácia nie je visible
+* odosielateľ
+* časť správy
+* nastavenie „iba adresované“
+* rešpektovanie DND
+
+UC: 8
+
+⸻
+
+B7 – Message store
+
+Zodpovednosť za:
+
+* stores/messages.ts
+* správy podľa kanálov
+* mock generovanie správ
+* načítanie stránok
+* mentions
+* typing stav
+* message actions
+
+⸻
+
+B8 – Realtime mock
+
+Vytvoriť spoločný mechanizmus pre fake realtime, napr.:
+
+src/mock/simulator.ts
+
+Simulator bude neskôr možné nahradiť WebSocket vrstvou bez nutnosti meniť komponenty.
+
+⸻
