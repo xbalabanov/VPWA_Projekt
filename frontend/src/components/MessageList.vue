@@ -2,7 +2,7 @@
      Vlastník: Maksym (B2).
      Má vlastný posuvník (nie celé okno), aby sa naň dal neskôr napojiť infinite scroll. -->
 <template>
-  <div ref="scroller" class="chat-scroll">
+  <div ref="scroller" class="chat-scroll" @scroll="onScroll">
     <div v-if="!channelsStore.activeChannel" class="empty-state">
       <q-icon name="forum" size="40px" />
       <div class="empty-title">No channel selected</div>
@@ -18,6 +18,12 @@
     </div>
 
     <ol v-else class="message-list" aria-label="Messages">
+      <li v-if="isLoading" class="history-status">
+        <q-spinner size="24px" />
+      </li>
+      <li v-else-if="!hasMore" class="history-status">
+        This is the start of #{{ channelsStore.activeChannel.name }}
+      </li>
       <li v-for="message in channelMessages" :key="message.id" class="message">
         <q-avatar
           size="36px"
@@ -66,6 +72,11 @@ export default defineComponent({
       const channelId = this.channelsStore.activeChannelId;
       return channelId !== null && this.messagesStore.loading[channelId] === true;
     },
+
+    hasMore(): boolean {
+      const channelId = this.channelsStore.activeChannelId;
+      return channelId !== null && this.messagesStore.hasMoreFor(channelId);
+    },
   },
 
   watch: {
@@ -109,6 +120,26 @@ export default defineComponent({
       this.scrollToBottom();
     },
 
+    // Keď je používateľ blízko vrchu, dočítame staršie správy.
+    onScroll(): void {
+      const scroller = this.$refs.scroller as HTMLElement;
+      if (scroller.scrollTop < 100) void this.loadOlderKeepingPosition();
+    },
+
+    // Načíta staršiu stránku a posunie scroll tak, aby obsah na obrazovke neposkočil.
+    async loadOlderKeepingPosition(): Promise<void> {
+      const channelId = this.channelsStore.activeChannelId;
+      if (channelId === null) return;
+
+      const scroller = this.$refs.scroller as HTMLElement;
+      const heightBefore = scroller.scrollHeight;
+
+      await this.messagesStore.loadOlder(channelId);
+      await this.$nextTick(); // počkáme, kým Vue vykreslí nové správy
+
+      scroller.scrollTop += scroller.scrollHeight - heightBefore;
+    },
+
     scrollToBottom(): void {
       // Čakáme, kým Vue vykreslí správy nového kanála.
       void this.$nextTick(() => {
@@ -126,6 +157,7 @@ export default defineComponent({
   flex: 1;
   flex-direction: column;
   overflow-y: auto;
+  overflow-anchor: none; /* scroll po dočítaní starších správ posúvame sami */
 }
 
 .message-list {
@@ -165,6 +197,14 @@ export default defineComponent({
   font-size: 0.9375rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.history-status {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+  color: var(--text-subtle);
+  font-size: 0.8125rem;
 }
 
 .empty-state {
