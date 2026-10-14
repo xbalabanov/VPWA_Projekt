@@ -1,8 +1,9 @@
 <!-- Jedna správa v zozname (UC 7).
      Vlastník: Maksym (B2). -->
 <template>
-  <li class="message">
+  <li class="message" :class="{ 'message--compact': compact }">
     <q-avatar
+      v-if="!compact"
       size="36px"
       font-size="13px"
       class="user-avatar"
@@ -10,8 +11,12 @@
     >
       {{ authorInitials }}
     </q-avatar>
+    <!-- V kompaktnej správe je miesto avatara prázdne, aby text lícoval so skupinou.
+         Pri prejdení myšou sa tam ukáže čas. -->
+    <time v-else class="message-gutter-time" :datetime="message.createdAt">{{ time }}</time>
+
     <div class="message-body">
-      <div class="message-meta">
+      <div v-if="!compact" class="message-meta">
         <span class="message-author">{{ authorName }}</span>
         <time class="message-time" :datetime="message.createdAt">{{ time }}</time>
       </div>
@@ -34,6 +39,12 @@ export default defineComponent({
     message: {
       type: Object as PropType<Message>,
       required: true,
+    },
+
+    // true = pokračovanie skupiny: bez avatara a mena, len text.
+    compact: {
+      type: Boolean,
+      default: false,
     },
   },
 
@@ -96,6 +107,29 @@ export default defineComponent({
   font-size: 0.9375rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+/* Pokračovanie skupiny: tesne pod predošlou správou. */
+.message--compact {
+  margin-top: 0;
+  padding-top: 2px;
+}
+.message:hover {
+  background: var(--surface);
+}
+
+/* Prázdne miesto namiesto avatara (rovnaká šírka 36px). Čas je skrytý, kým nie je hover. */
+.message-gutter-time {
+  width: 36px;
+  flex-shrink: 0;
+  padding-top: 4px;
+  color: var(--text-subtle);
+  font-size: 0.6875rem;
+  text-align: center;
+  visibility: hidden;
+}
+.message:hover .message-gutter-time {
+  visibility: visible;
 }
 
 @media (max-width: 599px) {

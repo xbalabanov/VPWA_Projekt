@@ -24,7 +24,12 @@
       <li v-else-if="!hasMore" class="history-status">
         This is the start of #{{ channelsStore.activeChannel.name }}
       </li>
-      <MessageItem v-for="message in channelMessages" :key="message.id" :message="message" />
+      <MessageItem
+        v-for="(message, index) in channelMessages"
+        :key="message.id"
+        :message="message"
+        :compact="isContinuation(index)"
+      />
     </ol>
   </div>
 </template>
@@ -36,6 +41,9 @@ import type { Message } from '../types/models';
 import { useChannelsStore } from '../stores/channels';
 import { useMessagesStore } from '../stores/messages';
 import MessageItem from './MessageItem.vue';
+
+// Správy toho istého autora do 5 minút od seba spojíme do jednej skupiny.
+const GROUP_GAP_MS = 5 * 60 * 1000;
 
 export default defineComponent({
   name: 'MessageList',
@@ -110,6 +118,17 @@ export default defineComponent({
         const scroller = this.$refs.scroller as HTMLElement | undefined;
         if (scroller) scroller.scrollTop = scroller.scrollHeight;
       });
+    },
+
+    // Pokračuje správa na pozícii `index` skupinu predošlej správy?
+    // (rovnaký autor a menej ako 5 minút od seba)
+    isContinuation(index: number): boolean {
+      const current = this.channelMessages[index];
+      const previous = this.channelMessages[index - 1];
+      if (!current || !previous) return false;
+
+      const gap = new Date(current.createdAt).getTime() - new Date(previous.createdAt).getTime();
+      return current.authorId === previous.authorId && gap < GROUP_GAP_MS;
     },
   },
 });

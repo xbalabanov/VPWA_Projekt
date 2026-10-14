@@ -44,7 +44,13 @@ function makeMessages(
   const newest = new Date('2026-10-02T09:00:00').getTime();
   const result: Message[] = [];
   for (let i = 0; i < count; i++) {
-    const authorId = pick(memberIds, i);
+    // Správy chodia v dávkach: jeden autor napíše 3 správy za sebou (1 min od seba),
+    // medzi dávkami sú 3 hodiny. Vďaka tomu vidno zoskupovanie aj oddeľovače dní.
+    const fromNewest = count - 1 - i; // 0 = najnovšia správa
+    const burst = Math.floor(fromNewest / 3); // poradie dávky od najnovšej
+    const authorId = pick(memberIds, burst);
+    const minutesAgo = burst * 180 + (fromNewest % 3);
+
     let content = pick(SAMPLE_TEXTS, i + channelId);
     // Niektoré správy adresujeme (nie samému autorovi).
     if (i % 7 === 3 && authorId !== 1) content = `@ed ${content}`;
@@ -54,7 +60,7 @@ function makeMessages(
       channelId,
       authorId,
       content,
-      createdAt: new Date(newest - (count - i) * 17 * 60000).toISOString(),
+      createdAt: new Date(newest - minutesAgo * 60000).toISOString(),
     });
   }
   return result;
