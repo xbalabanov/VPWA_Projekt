@@ -24,25 +24,7 @@
       <li v-else-if="!hasMore" class="history-status">
         This is the start of #{{ channelsStore.activeChannel.name }}
       </li>
-      <li v-for="message in channelMessages" :key="message.id" class="message">
-        <q-avatar
-          size="36px"
-          font-size="13px"
-          class="user-avatar"
-          :style="{ '--hue': avatarHue(message.authorId) }"
-        >
-          {{ authorInitials(message.authorId) }}
-        </q-avatar>
-        <div class="message-body">
-          <div class="message-meta">
-            <span class="message-author">{{ authorName(message.authorId) }}</span>
-            <time class="message-time" :datetime="message.createdAt">
-              {{ formatTime(message.createdAt) }}
-            </time>
-          </div>
-          <p class="message-text">{{ message.content }}</p>
-        </div>
-      </li>
+      <MessageItem v-for="message in channelMessages" :key="message.id" :message="message" />
     </ol>
   </div>
 </template>
@@ -53,15 +35,15 @@ import { mapStores } from 'pinia';
 import type { Message } from '../types/models';
 import { useChannelsStore } from '../stores/channels';
 import { useMessagesStore } from '../stores/messages';
-import { useUsersStore } from '../stores/users';
-import { avatarHue, initials } from '../utils/avatar';
+import MessageItem from './MessageItem.vue';
 
 export default defineComponent({
   name: 'MessageList',
+  components: { MessageItem },
 
   computed: {
     // Zdroj: https://pinia.vuejs.org/cookbook/options-api.html
-    ...mapStores(useChannelsStore, useMessagesStore, useUsersStore),
+    ...mapStores(useChannelsStore, useMessagesStore),
 
     channelMessages(): Message[] {
       const channelId = this.channelsStore.activeChannelId;
@@ -90,24 +72,6 @@ export default defineComponent({
   },
 
   methods: {
-    avatarHue,
-
-    authorName(userId: number): string {
-      return this.usersStore.userById(userId)?.nickName ?? 'Unknown user';
-    },
-
-    authorInitials(userId: number): string {
-      const user = this.usersStore.userById(userId);
-      return user ? initials(user.firstName, user.lastName) : '?';
-    },
-
-    formatTime(createdAt: string): string {
-      return new Date(createdAt).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    },
-
     // Pri otvorení kanála: ak z neho ešte nič nemáme, načítaj prvú stránku.
     // Potom zobraz najnovšie správy (dole), ako v každom chate.
     async openChannel(): Promise<void> {
@@ -168,36 +132,6 @@ export default defineComponent({
   padding: 20px 20px 12px;
   list-style: none;
 }
-.message {
-  display: flex;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 6px 8px 2px;
-  border-radius: 8px;
-}
-.message-body {
-  min-width: 0;
-  flex: 1;
-}
-.message-meta {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.message-author {
-  font-weight: 650;
-}
-.message-time {
-  color: var(--text-subtle);
-  font-size: 0.75rem;
-}
-.message-text {
-  max-width: 72ch;
-  margin: 1px 0 3px;
-  font-size: 0.9375rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
 
 .history-status {
   display: flex;
@@ -228,9 +162,6 @@ export default defineComponent({
 @media (max-width: 599px) {
   .message-list {
     padding: 12px 8px 8px;
-  }
-  .message {
-    gap: 10px;
   }
 }
 </style>
