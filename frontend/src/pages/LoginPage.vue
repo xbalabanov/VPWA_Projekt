@@ -33,6 +33,7 @@
 <script lang="ts">
 import { defineComponent } from 'vue';
 import { useUsersStore } from '../stores/users';
+import { useChannelsStore } from '../stores/channels';
 
 export default defineComponent({
   name: 'LoginPage',
@@ -52,6 +53,7 @@ export default defineComponent({
         return;
       }
       this.$q.notify({ message: 'Prihlásený', color: 'positive' });
+      useChannelsStore().selectFirstChannel();
       void this.$router.push('/');
     },
   },

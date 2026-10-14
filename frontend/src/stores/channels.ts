@@ -121,11 +121,117 @@ export const useChannelsStore = defineStore('channels', {
       (state) =>
       (channelId: number): number[] =>
         state.members.filter((m) => m.channelId === channelId).map((m) => m.userId),
+
+    myInvitations(state): Invitation[] {
+      const userId = useUsersStore().currentUserId;
+      return state.invitations.filter((i) => i.invitedUserId === userId);
+    },
+
+    channelByName:
+      (state) =>
+      (name: string): Channel | undefined =>
+        state.channels.find((c) => c.name.toLowerCase() === name.toLowerCase()),
+
+    isMember:
+      (state) =>
+      (channelId: number, userId: number): boolean =>
+        state.members.some((m) => m.channelId === channelId && m.userId === userId),
+
+    isAdmin:
+      (state) =>
+      (channelId: number, userId: number): boolean =>
+        state.channels.some((c) => c.id === channelId && c.adminId === userId),
+
+    isBanned:
+      (state) =>
+      (channelId: number, userId: number): boolean =>
+        state.bans.some((b) => b.channelId === channelId && b.userId === userId),
   },
 
   actions: {
     setActiveChannel(id: number) {
       this.activeChannelId = id;
+    },
+
+    //vrati null pri uspechu, inak text chyby
+    //tvorca je admin aj clen naraz
+    createChannel(name: string, isPrivate: boolean): string | null {
+      const userId = useUsersStore().currentUserId;
+      if (userId === null) return 'Nie si prihlásený';
+      if (this.channelByName(name)) return 'Kanál s týmto názvom už existuje';
+
+      const id = Math.max(0, ...this.channels.map((c) => c.id)) + 1;
+      this.channels.push({
+        id,
+        name,
+        isPrivate,
+        adminId: userId,
+        lastActivityAt: new Date().toISOString(),
+      });
+      this.members.push(member(id, userId));
+
+      this.activeChannelId = id;
+      return null;
+    },
+
+    deleteChannel(channelId: number): string | null {
+      const userId = useUsersStore().currentUserId;
+      if (userId === null) return 'Nie si prihlásený';
+      if (!this.isAdmin(channelId, userId)) return 'Kanál môže zmazať iba admin';
+
+      //filter necha iba prvky kde je podmienka true -> tuto nechaj vsetko okrem tohoto kanala
+      this.channels = this.channels.filter((c) => c.id !== channelId);
+      this.members = this.members.filter((m) => m.channelId !== channelId);
+      this.invitations = this.invitations.filter((i) => i.channelId !== channelId);
+      this.kickVotes = this.kickVotes.filter((v) => v.channelId !== channelId);
+      this.bans = this.bans.filter((b) => b.channelId !== channelId);
+
+      if (this.activeChannelId === channelId) this.selectFirstChannel();
+      return null;
+    },
+
+    leaveChannel(channelId: number): string | null {
+      const userId = useUsersStore().currentUserId;
+      if (userId === null) return 'Nie si prihlásený';
+      if (!this.isMember(channelId, userId)) return 'Nie si členom tohto kanála';
+
+      if (this.isAdmin(channelId, userId)) return this.deleteChannel(channelId);
+
+      //zo clenstiev odstrani zaznam, kde sedi kanal aj pouzivatel a ostantni pouzivatelia ostanu
+      this.members = this.members.filter(
+        (m) => !(m.channelId === channelId && m.userId === userId),
+      );
+
+      if (this.activeChannelId === channelId) this.selectFirstChannel();
+      return null;
+    },
+
+    //accept invite - pozvanka sa despawne a pozuzivatel sa stane clenom kanala
+    acceptInvitation(invitationId: number): string | null {
+      const invitation = this.invitations.find((i) => i.id === invitationId);
+      if (!invitation) return 'Pozvánka neexistuje';
+
+      this.members.push(member(invitation.channelId, invitation.invitedUserId));
+      this.invitations = this.invitations.filter((i) => i.id !== invitationId);
+
+      this.activeChannelId = invitation.channelId;
+      return null;
+    },
+
+    //odmietnutie pozvanky: zmaze pozvanku a kanal zmizne zo zoznamu
+    declineInvitation(invitationId: number): string | null {
+      if (!this.invitations.some((i) => i.id === invitationId)) return 'Pozvánka neexistuje';
+
+      this.invitations = this.invitations.filter((i) => i.id !== invitationId);
+      return null;
+    },
+
+    //otvor privy kanel, kde je pouzivatel clenom (alebo nic) - vola sa po logine, registracii,
+    // a ked pouzivatel opusti alebo zrusi aktivny channel
+    selectFirstChannel(): void {
+      this.activeChannelId = this.myChannels[0]?.id ?? null;
+      //?. -> ak neexistuje [0], vrati undefined
+      //?? null -> ak undefined, pouzi null
     },
   },
 });
