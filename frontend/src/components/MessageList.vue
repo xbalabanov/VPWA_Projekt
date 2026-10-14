@@ -8,6 +8,10 @@
       <div class="empty-title">No channel selected</div>
     </div>
 
+    <div v-else-if="isLoading && !channelMessages.length" class="empty-state">
+      <q-spinner size="32px" />
+    </div>
+
     <div v-else-if="!channelMessages.length" class="empty-state">
       <q-icon :name="channelsStore.activeChannel.isPrivate ? 'lock' : 'tag'" size="40px" />
       <div class="empty-title">No messages yet</div>
@@ -57,17 +61,21 @@ export default defineComponent({
       const channelId = this.channelsStore.activeChannelId;
       return channelId === null ? [] : this.messagesStore.messagesByChannel(channelId);
     },
+
+    isLoading(): boolean {
+      const channelId = this.channelsStore.activeChannelId;
+      return channelId !== null && this.messagesStore.loading[channelId] === true;
+    },
   },
 
   watch: {
-    // Po otvorení kanála zobraz najnovšie správy (dole), ako v každom chate.
     'channelsStore.activeChannelId'() {
-      this.scrollToBottom();
+      void this.openChannel();
     },
   },
 
   mounted() {
-    this.scrollToBottom();
+    void this.openChannel();
   },
 
   methods: {
@@ -87,6 +95,18 @@ export default defineComponent({
         hour: '2-digit',
         minute: '2-digit',
       });
+    },
+
+    // Pri otvorení kanála: ak z neho ešte nič nemáme, načítaj prvú stránku.
+    // Potom zobraz najnovšie správy (dole), ako v každom chate.
+    async openChannel(): Promise<void> {
+      const channelId = this.channelsStore.activeChannelId;
+      if (channelId === null) return;
+
+      if (this.messagesStore.messagesByChannel(channelId).length === 0) {
+        await this.messagesStore.loadOlder(channelId);
+      }
+      this.scrollToBottom();
     },
 
     scrollToBottom(): void {
