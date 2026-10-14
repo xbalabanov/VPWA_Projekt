@@ -250,3 +250,26 @@ src/mock/simulator.ts
 Simulator bude neskôr možné nahradiť WebSocket vrstvou bez nutnosti meniť komponenty.
 
 ⸻
+
+Stav prác (14. 10. 2026)
+
+Stanislav
+
+* UC1 – hotové (na main)
+    * login, logout, route guard
+    * registrácia: kontrola obsadeného nickName a emailu už počas písania (bez ohľadu na veľké/malé písmená)
+* UC2 – hotové (vetva feature/stanislav-channels, pushnutá, zatiaľ nezlúčená do main)
+    * channel store gettery: myInvitations, channelByName, isMember, isAdmin, isBanned
+    * channel store akcie: createChannel, deleteChannel, leaveChannel (správca → kanál zaniká), acceptInvitation, declineInvitation, selectFirstChannel
+    * ChannelList: pozvánky zvýraznené a navrchu, menu opustiť / zrušiť (iba správca, s potvrdením), dialóg na vytvorenie kanála
+    * 30-dňový zánik kanála odložený na backend (fáza 2)
+
+Ďalej (Stanislav)
+
+* UC4 – akcie joinChannel, inviteUser, revokeUser, kickUser (3 hlasy = ban, správca okamžite)
+* UC4, UC5 – commandHandlers.ts pre /join, /invite, /revoke, /kick, /quit, /cancel
+* dohodnúť s Maksymom rozhranie CommandLine → commandHandlers (napr. executeCommand(parsed) vracia null alebo text chyby)
+* UC10 – MembersList a /list
+* drobnosť: tlačidlo „Log in“ je o kúsok širšie ako polia (q-gutter-md)
+
+⸻
