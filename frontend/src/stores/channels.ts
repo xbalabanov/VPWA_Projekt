@@ -121,6 +121,31 @@ export const useChannelsStore = defineStore('channels', {
       (state) =>
       (channelId: number): number[] =>
         state.members.filter((m) => m.channelId === channelId).map((m) => m.userId),
+
+    myInvitations(state): Invitation[] {
+      const userId = useUsersStore().currentUserId;
+      return state.invitations.filter((i) => i.invitedUserId === userId);
+    },
+
+    channelByName:
+      (state) =>
+      (name: string): Channel | undefined =>
+        state.channels.find((c) => c.name.toLowerCase() === name.toLowerCase()),
+
+    isMember:
+      (state) =>
+      (channelId: number, userId: number): boolean =>
+        state.members.some((m) => m.channelId === channelId && m.userId === userId),
+
+    isAdmin:
+      (state) =>
+      (channelId: number, userId: number): boolean =>
+        state.channels.some((c) => c.id === channelId && c.adminId === userId),
+
+    isBanned:
+      (state) =>
+      (channelId: number, userId: number): boolean =>
+        state.bans.some((b) => b.channelId === channelId && b.userId === userId),
   },
 
   actions: {
