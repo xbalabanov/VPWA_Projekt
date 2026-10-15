@@ -3,6 +3,20 @@
      Príkazy rozpozná utils/commandParser.ts. -->
 <template>
   <div class="command-line">
+    <ul v-if="suggestions.length" class="command-suggestions" role="listbox" aria-label="Commands">
+      <li
+        v-for="(suggestion, index) in suggestions"
+        :key="suggestion.name"
+        class="command-suggestion"
+        :class="{ 'command-suggestion--active': index === activeSuggestion }"
+        role="option"
+        :aria-selected="index === activeSuggestion"
+        @mouseenter="activeSuggestion = index"
+        @mousedown.prevent="pickSuggestion(index)"
+      >
+        <code>{{ suggestion.usage }}</code>
+      </li>
+    </ul>
     <Transition name="command-note" mode="out-in">
       <div v-if="error" key="error" class="command-note command-note--error" role="alert">
         <q-icon name="error_outline" size="18px" />
@@ -20,7 +34,7 @@
       borderless
       placeholder="Write a message or /command"
       aria-label="Message or command"
-      @keydown.enter.prevent="submit"
+      @keydown="onKeydown"
     >
       <template #append>
         <q-btn
@@ -43,7 +57,7 @@ import { defineComponent } from 'vue';
 import { mapStores } from 'pinia';
 import { useChannelsStore } from '../stores/channels';
 import { useMessagesStore } from '../stores/messages';
-import { commandUsage, parseInput } from '../utils/commandParser';
+import { COMMAND_NAMES, commandUsage, parseInput, type CommandName } from '../utils/commandParser';
 
 export default defineComponent({
   name: 'CommandLine',
@@ -53,6 +67,7 @@ export default defineComponent({
       text: '',
       error: null as string | null, // hláška pod políčkom (chyba parsera, servera...)
       sending: false, // práve čakáme na server
+      activeSuggestion: 0, // ktorý návrh v zozname je vybraný (šípkami)
     };
   },
 
@@ -64,16 +79,63 @@ export default defineComponent({
       const parsed = parseInput(this.text);
       return parsed.command ? commandUsage(parsed.command) : null;
     },
+
+    // Návrhy príkazov, kým píšeš názov príkazu ("/", "/in"...). Prázdne pole = zoznam skrytý.
+    suggestions(): { name: CommandName; usage: string }[] {
+      const match = /^\/(\S*)$/.exec(this.text); // "/" a za ním zatiaľ žiadna medzera
+      if (!match) return [];
+
+      const typed = (match[1] ?? '').toLowerCase();
+      // Celý dopísaný príkaz už netreba ponúkať, Enter ho má odoslať.
+      if (COMMAND_NAMES.includes(typed as CommandName)) return [];
+
+      return COMMAND_NAMES.filter((name) => name.startsWith(typed)).map((name) => ({
+        name,
+        usage: commandUsage(name),
+      }));
+    },
   },
 
   watch: {
     // Keď používateľ začne písať, stará chyba už neplatí.
     text() {
       this.error = null;
+      this.activeSuggestion = 0; // nový text = nový zoznam, výber od začiatku
     },
   },
 
   methods: {
+    // Klávesy v políčku: šípky/Tab/Enter ovládajú zoznam návrhov, inak Enter odošle.
+    onKeydown(event: KeyboardEvent): void {
+      if (event.isComposing) return; // písanie diakritiky cez IME, Enter ešte nie je "odoslať"
+
+      const count = this.suggestions.length;
+      if (count > 0) {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault(); // inak by šípka posunula kurzor v texte
+          const step = event.key === 'ArrowDown' ? 1 : -1;
+          this.activeSuggestion = (this.activeSuggestion + step + count) % count;
+          return;
+        }
+        if (event.key === 'Tab' || event.key === 'Enter') {
+          event.preventDefault(); // Tab by inak preskočil na ďalší prvok stránky
+          this.pickSuggestion(this.activeSuggestion);
+          return;
+        }
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        void this.submit();
+      }
+    },
+
+    // Doplní vybraný príkaz do políčka, kurzor je pripravený na argumenty.
+    pickSuggestion(index: number): void {
+      const suggestion = this.suggestions[index];
+      if (suggestion) this.text = `/${suggestion.name} `;
+    },
+
     async submit(): Promise<void> {
       if (this.sending) return; // poistka proti dvojitému Enteru
 
@@ -162,6 +224,30 @@ export default defineComponent({
   color: var(--text-muted);
 }
 .command-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Zoznam návrhov príkazov nad políčkom. */
+.command-suggestions {
+  margin: 0 0 8px;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.command-suggestion {
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.command-suggestion--active {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.command-suggestion code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
