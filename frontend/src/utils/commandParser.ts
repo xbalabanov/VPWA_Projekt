@@ -59,3 +59,11 @@ export function parseInput(raw: string): ParsedInput {
 
   return { kind: 'command', command: name, args, text };
 }
+
+// Všetky názvy príkazov, napr. pre dopĺňanie v CommandLine.
+export const COMMAND_NAMES = Object.keys(COMMANDS) as CommandName[];
+
+// Syntax príkazu pre nápovedu, napr. "/invite nickName".
+export function commandUsage(name: CommandName): string {
+  return COMMANDS[name].usage;
+}
