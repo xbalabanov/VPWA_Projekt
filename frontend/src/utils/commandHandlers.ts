@@ -34,7 +34,7 @@ export function executeCommand(parsed: ParsedInput): string | null {
       //iba admin zrusi channel
       return channelsStore.deleteChannel(channelId);
     case 'list':
-      return 'Príkaz /list zatial nie je hotovy'; //UC10
+      return channelsStore.openMembersList(channelId);
     default:
       return 'Neznámy príkaz';
   }

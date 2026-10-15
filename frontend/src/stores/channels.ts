@@ -12,6 +12,7 @@ interface ChannelsState {
   kickVotes: KickVote[];
   bans: Ban[];
   activeChannelId: number | null;
+  membersOpen: boolean; //pravy panel so zoznamom clenov
 }
 
 // Pevný dátum pre falošné členstvá, aby sa mock dáta nemenili pri každom spustení.
@@ -103,6 +104,7 @@ export const useChannelsStore = defineStore('channels', {
     kickVotes: [],
     bans: [],
     activeChannelId: 1,
+    membersOpen: false,
   }),
 
   getters: {
@@ -366,6 +368,15 @@ export const useChannelsStore = defineStore('channels', {
 
       this.kickVotes.push({ channelId, targetUserId: target.id, voterId: userId });
       if (votes.length + 1 >= KICK_VOTES_FOR_BAN) this.banUser(channelId, target.id);
+      return null;
+    },
+
+    openMembersList(channelId: number): string | null {
+      const userId = useUsersStore().currentUserId;
+      if (userId === null) return 'Nie si prihlásený';
+      if (!this.isMember(channelId, userId)) return 'Nie si členom tohto kanála';
+
+      this.membersOpen = true;
       return null;
     },
   },
