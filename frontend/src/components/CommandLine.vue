@@ -3,10 +3,14 @@
      Príkazy rozpozná utils/commandParser.ts. -->
 <template>
   <div class="command-line">
-    <Transition name="command-error">
-      <div v-if="error" class="command-error" role="alert">
+    <Transition name="command-note" mode="out-in">
+      <div v-if="error" key="error" class="command-note command-note--error" role="alert">
         <q-icon name="error_outline" size="18px" />
         <span>{{ error }}</span>
+      </div>
+      <div v-else-if="hint" key="hint" class="command-note command-note--hint">
+        <q-icon name="keyboard_command_key" size="16px" />
+        <code>{{ hint }}</code>
       </div>
     </Transition>
     <q-input
@@ -39,7 +43,7 @@ import { defineComponent } from 'vue';
 import { mapStores } from 'pinia';
 import { useChannelsStore } from '../stores/channels';
 import { useMessagesStore } from '../stores/messages';
-import { parseInput } from '../utils/commandParser';
+import { commandUsage, parseInput } from '../utils/commandParser';
 
 export default defineComponent({
   name: 'CommandLine',
@@ -54,6 +58,12 @@ export default defineComponent({
 
   computed: {
     ...mapStores(useChannelsStore, useMessagesStore),
+
+    // Syntax príkazu, ktorý práve píšeš, napr. "/invite nickName". null = nič nepíšeš.
+    hint(): string | null {
+      const parsed = parseInput(this.text);
+      return parsed.command ? commandUsage(parsed.command) : null;
+    },
   },
 
   watch: {
@@ -131,43 +141,47 @@ export default defineComponent({
   color: var(--accent);
 }
 
-/* Chybová hláška nad políčkom (chyba parsera, servera...). */
-.command-error {
+/* Hláška nad políčkom: chyba (červená) alebo nápoveda syntaxe príkazu (šedá). */
+.command-note {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
   padding: 6px 10px;
   border-radius: 8px;
+  font-size: 0.8125rem;
+}
+.command-note--error {
   background: var(--danger-soft);
   color: var(--danger);
-  font-size: 0.8125rem;
   font-weight: 500;
 }
+.command-note--hint {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.command-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 
-/* Animácia objavenia/zmiznutia hlášky (<Transition name="command-error">).
+/* Animácia objavenia/zmiznutia hlášky (<Transition name="command-note">).
    https://vuejs.org/guide/built-ins/transition.html */
-.command-error-enter-active,
-.command-error-leave-active {
+.command-note-enter-active,
+.command-note-leave-active {
   transition:
     opacity 150ms ease,
     transform 150ms ease;
 }
-.command-error-enter-from,
-.command-error-leave-to {
+.command-note-enter-from,
+.command-note-leave-to {
   opacity: 0;
   transform: translateY(4px);
 }
 @media (prefers-reduced-motion: reduce) {
-  .command-error-enter-active,
-  .command-error-leave-active {
+  .command-note-enter-active,
+  .command-note-leave-active {
     transition: none;
-  }
-}
-
-@media (max-width: 599px) {
-  .command-line {
-    padding: 8px;
   }
 }
 </style>
