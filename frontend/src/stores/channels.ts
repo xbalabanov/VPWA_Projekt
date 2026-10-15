@@ -16,6 +16,7 @@ interface ChannelsState {
 
 // Pevný dátum pre falošné členstvá, aby sa mock dáta nemenili pri každom spustení.
 const JOINED_AT = '2026-09-25T10:00:00.000Z';
+const KICK_VOTES_FOR_BAN = 3;
 
 function member(channelId: number, userId: number): ChannelMember {
   return { channelId, userId, joinedAt: JOINED_AT };
@@ -226,12 +227,146 @@ export const useChannelsStore = defineStore('channels', {
       return null;
     },
 
+    removeMember(channelId: number, userId: number): void {
+      this.members = this.members.filter(
+        (m) => !(m.channelId === channelId && m.userId === userId),
+      );
+    },
+
+    banUser(channelId: number, userId: number): void {
+      this.removeMember(channelId, userId);
+      this.kickVotes = this.kickVotes.filter(
+        (v) => !(v.channelId === channelId && v.targetUserId === userId),
+      );
+      if (!this.isBanned(channelId, userId)) this.bans.push({ channelId, userId });
+    },
+
     //otvor privy kanel, kde je pouzivatel clenom (alebo nic) - vola sa po logine, registracii,
     // a ked pouzivatel opusti alebo zrusi aktivny channel
     selectFirstChannel(): void {
       this.activeChannelId = this.myChannels[0]?.id ?? null;
       //?. -> ak neexistuje [0], vrati undefined
       //?? null -> ak undefined, pouzi null
+    },
+
+    joinChannel(name: string, isPrivate: boolean): string | null {
+      const userId = useUsersStore().currentUserId;
+      if (userId === null) return 'Nie si prihlásený';
+
+      const channel = this.channelByName(name);
+      if (!channel) return this.createChannel(name, isPrivate);
+
+      if (this.isMember(channel.id, userId)) {
+        this.activeChannelId = channel.id;
+        return null;
+      }
+      if (channel.isPrivate) return 'Kanál je súkromný, potrebuješ pozvánku';
+      if (this.isBanned(channel.id, userId)) return 'Máš zakázaný prístup do tohto kanála';
+
+      this.members.push(member(channel.id, userId));
+      //ak som mal pozvnaku, uz netreba
+
+      this.invitations = this.invitations.filter(
+        (i) => !(i.channelId === channel.id && i.invitedUserId === userId),
+      );
+      this.activeChannelId = channel.id;
+      return null;
+    },
+
+    inviteUser(channelId: number, nickName: string): string | null {
+      const usersStore = useUsersStore();
+      const userId = usersStore.currentUserId;
+      if (userId === null) return 'Nie si prihlásený';
+
+      const channel = this.channels.find((c) => c.id === channelId);
+      if (!channel) return 'Kanál neexistuje';
+      const target = usersStore.userByNickName(nickName);
+      if (!target) return `Používateľ ${nickName} neexistuje`;
+
+      const admin = this.isAdmin(channelId, userId);
+      if (!this.isMember(channelId, userId)) return 'Nie si členom tohto kanála';
+      if (channel.isPrivate && !admin) return 'Do súkromného kanála vie pozývať iba admin';
+      if (this.isMember(channelId, target.id)) return `${target.nickName} už je členom kanála`;
+
+      if (this.isBanned(channelId, target.id)) {
+        if (!admin) return `${target.nickName} má zakázaný prístup, môže ho pozývať iba správca`;
+        this.bans = this.bans.filter((b) => !(b.channelId === channelId && b.userId === target.id));
+      }
+
+      if (this.invitations.some((i) => i.channelId === channelId && i.invitedUserId === target.id))
+        return `${target.nickName} je už pozvaný`;
+
+      const id = Math.max(0, ...this.invitations.map((i) => i.id)) + 1;
+      this.invitations.push({
+        id,
+        channelId,
+        invitedUserId: target.id,
+        invitedById: userId,
+        createdAt: new Date().toISOString(),
+      });
+      return null;
+    },
+
+    revokeUser(channelId: number, nickName: string): string | null {
+      const usersStore = useUsersStore();
+      const userId = usersStore.currentUserId;
+      if (userId === null) return 'Nie si prihlásený';
+
+      const channel = this.channels.find((c) => c.id === channelId);
+      if (!channel) return 'Kanál neexistuje';
+      if (!channel.isPrivate) return 'Príkaz /revoke je iba pre súkromné kanály, použi /kick';
+      if (!this.isAdmin(channelId, userId)) return 'Používateľa môže odobrať iba správca';
+
+      const target = usersStore.userByNickName(nickName);
+      if (!target) return `Používateľ ${nickName} neexistuje`;
+      if (target.id === userId) return 'Nemôžeš odobrať sám seba, použi /cancel';
+
+      if (this.isMember(channelId, target.id)) {
+        this.removeMember(channelId, target.id);
+        return null;
+      }
+
+      const invited = this.invitations.some(
+        (i) => i.channelId === channelId && i.invitedUserId === target.id,
+      );
+      if (!invited) return `${target.nickName} nie je členom kanála`;
+
+      this.invitations = this.invitations.filter(
+        (i) => !(i.channelId === channelId && i.invitedUserId === target.id),
+      );
+      return null;
+    },
+
+    kickUser(channelId: number, nickName: string): string | null {
+      const usersStore = useUsersStore();
+      const userId = usersStore.currentUserId;
+      if (userId === null) return 'Nie si prihlásený';
+
+      const channel = this.channels.find((c) => c.id === channelId);
+      if (!channel) return 'Kanál neexistuje';
+      if (!this.isMember(channelId, userId)) return 'Nie si členom tohto kanála';
+
+      const target = usersStore.userByNickName(nickName);
+      if (!target) return `Používateľ ${nickName} neexistuje`;
+      if (target.id === userId) return 'Nemôžeš vyhodiť sám seba, použi /cancel';
+      if (!this.isMember(channelId, target.id)) return `${target.nickName} nie je členom kanála`;
+
+      if (this.isAdmin(channelId, userId)) {
+        this.banUser(channelId, target.id);
+        return null;
+      }
+      if (channel.isPrivate) return 'V súkromnom kanály môže vyhadzovať iba správca';
+      if (this.isAdmin(channelId, target.id)) return 'Admina nemožno vyhodiť';
+
+      const votes = this.kickVotes.filter(
+        (v) => v.channelId === channelId && v.targetUserId === target.id,
+      );
+      if (votes.some((v) => v.voterId === userId))
+        return `Za vyhodenie ${target.nickName} si už zahlasoval`;
+
+      this.kickVotes.push({ channelId, targetUserId: target.id, voterId: userId });
+      if (votes.length + 1 >= KICK_VOTES_FOR_BAN) this.banUser(channelId, target.id);
+      return null;
     },
   },
 });
