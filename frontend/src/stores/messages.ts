@@ -106,6 +106,23 @@ function fetchMessages(
   });
 }
 
+// Simuluje API: POST /channels/:id/messages
+// Server pridelí id a čas, uloží správu a vráti ju hotovú.
+function postMessage(channelId: number, authorId: number, content: string): Promise<Message> {
+  const message: Message = {
+    id: Math.max(0, ...SERVER_MESSAGES.map((m) => m.id)) + 1,
+    channelId,
+    authorId,
+    content,
+    createdAt: new Date().toISOString(),
+  };
+  SERVER_MESSAGES.push(message); // "uloží do databázy"
+
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(message), 150);
+  });
+}
+
 export const useMessagesStore = defineStore('messages', {
   state: (): MessagesState => ({
     messages: [], // len správy, ktoré si klient už stiahol zo "servera"
@@ -159,6 +176,21 @@ export const useMessagesStore = defineStore('messages', {
       } finally {
         this.loading[channelId] = false;
       }
+    },
+
+    // Odošle správu prihláseného používateľa do kanála (UC 3).
+    // Vráti chybu ako text, alebo null pri úspechu.
+    async sendMessage(channelId: number, content: string): Promise<string | null> {
+      const authorId = useUsersStore().currentUserId;
+      if (authorId === null) return 'You are not logged in';
+
+      const text = content.trim();
+      if (!text) return null; // prázdnu správu ticho ignorujeme
+
+      const message = await postMessage(channelId, authorId, text);
+      this.messages.push(message); // nová správa ide na koniec (je najnovšia)
+      this.rememberMentions([message]);
+      return null;
     },
 
     // Zapamätá si, koho správy zmieňujú. Skutočný server by Mention záznamy poslal sám,
