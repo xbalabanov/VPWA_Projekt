@@ -2,10 +2,14 @@
      Vlastník: Maksym (B2).
      Má vlastný posuvník (nie celé okno), aby sa naň dal neskôr napojiť infinite scroll. -->
 <template>
-  <div ref="scroller" class="chat-scroll">
+  <div ref="scroller" class="chat-scroll" @scroll="onScroll">
     <div v-if="!channelsStore.activeChannel" class="empty-state">
       <q-icon name="forum" size="40px" />
       <div class="empty-title">No channel selected</div>
+    </div>
+
+    <div v-else-if="isLoading && !channelMessages.length" class="empty-state">
+      <q-spinner size="32px" />
     </div>
 
     <div v-else-if="!channelMessages.length" class="empty-state">
@@ -14,25 +18,18 @@
     </div>
 
     <ol v-else class="message-list" aria-label="Messages">
-      <li v-for="message in channelMessages" :key="message.id" class="message">
-        <q-avatar
-          size="36px"
-          font-size="13px"
-          class="user-avatar"
-          :style="{ '--hue': avatarHue(message.authorId) }"
-        >
-          {{ authorInitials(message.authorId) }}
-        </q-avatar>
-        <div class="message-body">
-          <div class="message-meta">
-            <span class="message-author">{{ authorName(message.authorId) }}</span>
-            <time class="message-time" :datetime="message.createdAt">
-              {{ formatTime(message.createdAt) }}
-            </time>
-          </div>
-          <p class="message-text">{{ message.content }}</p>
-        </div>
+      <li v-if="isLoading" class="history-status">
+        <q-spinner size="24px" />
       </li>
+      <li v-else-if="!hasMore" class="history-status">
+        This is the start of #{{ channelsStore.activeChannel.name }}
+      </li>
+      <template v-for="(message, index) in channelMessages" :key="message.id">
+        <li v-if="startsNewDay(index)" class="day-divider">
+          <span>{{ dayLabel(message.createdAt) }}</span>
+        </li>
+        <MessageItem :message="message" :compact="isContinuation(index)" />
+      </template>
     </ol>
   </div>
 </template>
@@ -43,11 +40,32 @@ import { mapStores } from 'pinia';
 import type { Message } from '../types/models';
 import { useChannelsStore } from '../stores/channels';
 import { useMessagesStore } from '../stores/messages';
+import MessageItem from './MessageItem.vue';
 import { useUsersStore } from '../stores/users';
-import { avatarHue, initials } from '../utils/avatar';
+
+// Správy toho istého autora do 5 minút od seba spojíme do jednej skupiny.
+const GROUP_GAP_MS = 5 * 60 * 1000;
+
+// Sú dva dátumy v ten istý kalendárny deň (v miestnom čase)?
+function isSameDay(a: Date, b: Date): boolean {
+  return a.toDateString() === b.toDateString();
+}
+
+// Text oddeľovača dní: "Today", "Yesterday" alebo napr. "Thursday, 1 October".
+function dayLabel(createdAt: string): string {
+  const date = new Date(createdAt);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (isSameDay(date, today)) return 'Today';
+  if (isSameDay(date, yesterday)) return 'Yesterday';
+  return date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+}
 
 export default defineComponent({
   name: 'MessageList',
+  components: { MessageItem },
 
   computed: {
     // Zdroj: https://pinia.vuejs.org/cookbook/options-api.html
@@ -57,36 +75,73 @@ export default defineComponent({
       const channelId = this.channelsStore.activeChannelId;
       return channelId === null ? [] : this.messagesStore.messagesByChannel(channelId);
     },
+
+    isLoading(): boolean {
+      const channelId = this.channelsStore.activeChannelId;
+      return channelId !== null && this.messagesStore.loading[channelId] === true;
+    },
+
+    hasMore(): boolean {
+      const channelId = this.channelsStore.activeChannelId;
+      return channelId !== null && this.messagesStore.hasMoreFor(channelId);
+    },
+
+    // id najnovšej načítanej správy; mení sa len keď pribudne správa dole.
+    lastMessageId(): number | null {
+      return this.channelMessages[this.channelMessages.length - 1]?.id ?? null;
+    },
   },
 
   watch: {
-    // Po otvorení kanála zobraz najnovšie správy (dole), ako v každom chate.
     'channelsStore.activeChannelId'() {
-      this.scrollToBottom();
+      void this.openChannel();
+    },
+
+    // Pribudla správa dole (odoslaná alebo prijatá).
+    lastMessageId(newId: number | null, oldId: number | null) {
+      if (newId === null || oldId === null || newId === oldId) return;
+
+      const last = this.channelMessages[this.channelMessages.length - 1];
+      const isMine = last?.authorId === this.usersStore.currentUserId;
+      if (isMine || this.isNearBottom()) this.scrollToBottom();
     },
   },
 
   mounted() {
-    this.scrollToBottom();
+    void this.openChannel();
   },
 
   methods: {
-    avatarHue,
+    // Pri otvorení kanála: ak z neho ešte nič nemáme, načítaj prvú stránku.
+    // Potom zobraz najnovšie správy (dole), ako v každom chate.
+    async openChannel(): Promise<void> {
+      const channelId = this.channelsStore.activeChannelId;
+      if (channelId === null) return;
 
-    authorName(userId: number): string {
-      return this.usersStore.userById(userId)?.nickName ?? 'Unknown user';
+      if (this.messagesStore.messagesByChannel(channelId).length === 0) {
+        await this.messagesStore.loadOlder(channelId);
+      }
+      this.scrollToBottom();
     },
 
-    authorInitials(userId: number): string {
-      const user = this.usersStore.userById(userId);
-      return user ? initials(user.firstName, user.lastName) : '?';
+    // Keď je používateľ blízko vrchu, dočítame staršie správy.
+    onScroll(): void {
+      const scroller = this.$refs.scroller as HTMLElement;
+      if (scroller.scrollTop < 100) void this.loadOlderKeepingPosition();
     },
 
-    formatTime(createdAt: string): string {
-      return new Date(createdAt).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+    // Načíta staršiu stránku a posunie scroll tak, aby obsah na obrazovke neposkočil.
+    async loadOlderKeepingPosition(): Promise<void> {
+      const channelId = this.channelsStore.activeChannelId;
+      if (channelId === null) return;
+
+      const scroller = this.$refs.scroller as HTMLElement;
+      const heightBefore = scroller.scrollHeight;
+
+      await this.messagesStore.loadOlder(channelId);
+      await this.$nextTick(); // počkáme, kým Vue vykreslí nové správy
+
+      scroller.scrollTop += scroller.scrollHeight - heightBefore;
     },
 
     scrollToBottom(): void {
@@ -95,6 +150,37 @@ export default defineComponent({
         const scroller = this.$refs.scroller as HTMLElement | undefined;
         if (scroller) scroller.scrollTop = scroller.scrollHeight;
       });
+    },
+
+    // Pokračuje správa na pozícii `index` skupinu predošlej správy?
+    // (rovnaký autor a menej ako 5 minút od seba)
+    isContinuation(index: number): boolean {
+      const current = this.channelMessages[index];
+      const previous = this.channelMessages[index - 1];
+      if (!current || !previous) return false;
+
+      const gap = new Date(current.createdAt).getTime() - new Date(previous.createdAt).getTime();
+      return (
+        current.authorId === previous.authorId && gap < GROUP_GAP_MS && !this.startsNewDay(index)
+      );
+    },
+
+    dayLabel,
+
+    // Začína správa na pozícii `index` nový deň? (prvá načítaná správa vždy áno)
+    startsNewDay(index: number): boolean {
+      const current = this.channelMessages[index];
+      const previous = this.channelMessages[index - 1];
+      if (!current) return false;
+      if (!previous) return true;
+      return !isSameDay(new Date(current.createdAt), new Date(previous.createdAt));
+    },
+
+    // Je používateľ (skoro) úplne dole? Tolerancia 150 px.
+    isNearBottom(): boolean {
+      const scroller = this.$refs.scroller as HTMLElement | undefined;
+      if (!scroller) return true;
+      return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 150;
     },
   },
 });
@@ -106,6 +192,7 @@ export default defineComponent({
   flex: 1;
   flex-direction: column;
   overflow-y: auto;
+  overflow-anchor: none; /* scroll po dočítaní starších správ posúvame sami */
 }
 
 .message-list {
@@ -116,35 +203,13 @@ export default defineComponent({
   padding: 20px 20px 12px;
   list-style: none;
 }
-.message {
+
+.history-status {
   display: flex;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 6px 8px 2px;
-  border-radius: 8px;
-}
-.message-body {
-  min-width: 0;
-  flex: 1;
-}
-.message-meta {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.message-author {
-  font-weight: 650;
-}
-.message-time {
+  justify-content: center;
+  padding: 12px 0 4px;
   color: var(--text-subtle);
-  font-size: 0.75rem;
-}
-.message-text {
-  max-width: 72ch;
-  margin: 1px 0 3px;
-  font-size: 0.9375rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
 }
 
 .empty-state {
@@ -165,12 +230,26 @@ export default defineComponent({
   font-weight: 650;
 }
 
+/* Oddeľovač dní: text v strede, čiara naľavo aj napravo. */
+.day-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 4px;
+  color: var(--text-subtle);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.day-divider::before,
+.day-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+
 @media (max-width: 599px) {
   .message-list {
     padding: 12px 8px 8px;
-  }
-  .message {
-    gap: 10px;
   }
 }
 </style>

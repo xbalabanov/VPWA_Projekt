@@ -38,6 +38,9 @@
 
   --focus: oklch(0.55 0.12 160);
 
+  --danger: oklch(0.52 0.18 27); // chyby (príkazový riadok, formuláre)
+  --danger-soft: oklch(0.95 0.03 27);
+
   // Quasar komponenty (color="primary", tmavé panely) čítajú tieto premenné.
   --q-primary: var(--accent);
 }
@@ -68,6 +71,9 @@ body.body--dark {
   --offline: oklch(0.55 0.01 160);
 
   --focus: oklch(0.74 0.11 160);
+
+  --danger: oklch(0.75 0.14 27);
+  --danger-soft: oklch(0.29 0.06 27);
 
   --q-dark: var(--sidebar);
   --q-dark-page: var(--bg);
