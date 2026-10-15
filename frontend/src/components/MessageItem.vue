@@ -1,7 +1,10 @@
 <!-- Jedna správa v zozname (UC 7).
      Vlastník: Maksym (B2). -->
 <template>
-  <li class="message" :class="{ 'message--compact': compact, 'message--own': isOwn }">
+  <li
+    class="message"
+    :class="{ 'message--compact': compact, 'message--own': isOwn, 'message--mention': mentionsMe }"
+  >
     <q-avatar
       v-if="!compact"
       size="36px"
@@ -20,7 +23,17 @@
         <span class="message-author">{{ authorName }}</span>
         <time class="message-time" :datetime="message.createdAt">{{ time }}</time>
       </div>
-      <p class="message-text">{{ message.content }}</p>
+      <p class="message-text">
+        <template v-for="(part, index) in contentParts" :key="index">
+          <span
+            v-if="part.nickName"
+            class="mention"
+            :class="{ 'mention--me': isMyNick(part.nickName) }"
+            >{{ part.text }}</span
+          >
+          <template v-else>{{ part.text }}</template>
+        </template>
+      </p>
     </div>
   </li>
 </template>
@@ -31,6 +44,8 @@ import { mapStores } from 'pinia';
 import type { Message, User } from '../types/models';
 import { useUsersStore } from '../stores/users';
 import { avatarHue, initials } from '../utils/avatar';
+import { useMessagesStore } from '../stores/messages';
+import { splitMentions, type ContentPart } from '../utils/mentions';
 
 export default defineComponent({
   name: 'MessageItem',
@@ -49,7 +64,7 @@ export default defineComponent({
   },
 
   computed: {
-    ...mapStores(useUsersStore),
+    ...mapStores(useUsersStore, useMessagesStore),
 
     author(): User | undefined {
       return this.usersStore.userById(this.message.authorId);
@@ -74,10 +89,27 @@ export default defineComponent({
     isOwn(): boolean {
       return this.message.authorId === this.usersStore.currentUserId;
     },
+
+    // Je táto správa adresovaná prihlásenému používateľovi? (UC 6)
+    mentionsMe(): boolean {
+      const myId = this.usersStore.currentUserId;
+      return myId !== null && this.messagesStore.isMentioned(this.message.id, myId);
+    },
+
+    // Text rozdelený na obyčajný text a zmienky @nickname.
+    contentParts(): ContentPart[] {
+      return splitMentions(this.message.content);
+    },
   },
 
   methods: {
     avatarHue,
+
+    // Je to zmienka prihláseného používateľa? (bez ohľadu na veľké/malé písmená)
+    isMyNick(nickName: string): boolean {
+      const me = this.usersStore.currentUser;
+      return me !== undefined && me.nickName.toLowerCase() === nickName.toLowerCase();
+    },
   },
 });
 </script>
@@ -146,6 +178,25 @@ export default defineComponent({
 }
 .message--own:hover {
   background: var(--accent-soft);
+}
+
+/* Zmienka @nickname v texte. Moja zmienka má farbu zmienok, cudzia farbu akcentu. */
+.mention {
+  color: var(--accent);
+  font-weight: 600;
+}
+.mention--me {
+  color: var(--mention-text);
+}
+
+/* Celá správa adresovaná mne (UC 6): výrazné pozadie, aby sa nedala prehliadnuť. */
+.message--mention {
+  border-radius: 0;
+  background: var(--mention-bg);
+  box-shadow: inset 2px 0 0 var(--mention-text);
+}
+.message--mention:hover {
+  background: color-mix(in oklch, var(--mention-bg) 85%, var(--mention-text));
 }
 
 @media (max-width: 599px) {

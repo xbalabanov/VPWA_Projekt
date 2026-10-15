@@ -2,12 +2,15 @@
 // Spoločný základ: falošné správy a jednoduché vyhľadávanie. Akcie (odoslanie,
 // stránkovanie, @nickname, písanie) pribudnú v úlohách B2-B4 a B7.
 import { defineStore } from 'pinia';
-import type { Message } from '../types/models';
+import type { Mention, Message } from '../types/models';
+import { useUsersStore } from './users';
+import { extractNickNames } from '../utils/mentions';
 
 interface MessagesState {
   messages: Message[]; // načítané správy; v rámci kanála od najstaršej po najnovšiu
   hasMore: Record<number, boolean>; // channelId -> sú na serveri ešte staršie správy?
   loading: Record<number, boolean>; // channelId -> práve načítavame?
+  mentions: Mention[]; // koho ktorá načítaná správa zmieňuje (@nickname)
 }
 
 // --- Generovanie falošnej histórie (dosť správ aj na neskorší infinite scroll) ---
@@ -108,6 +111,7 @@ export const useMessagesStore = defineStore('messages', {
     messages: [], // len správy, ktoré si klient už stiahol zo "servera"
     hasMore: {},
     loading: {},
+    mentions: [],
   }),
 
   getters: {
@@ -123,6 +127,12 @@ export const useMessagesStore = defineStore('messages', {
       (state) =>
       (channelId: number): boolean =>
         state.hasMore[channelId] !== false,
+
+    // Zmieňuje správa daného používateľa? (UC 6, neskôr aj notifikácie B6)
+    isMentioned:
+      (state) =>
+      (messageId: number, userId: number): boolean =>
+        state.mentions.some((m) => m.messageId === messageId && m.userId === userId),
   },
 
   actions: {
@@ -142,11 +152,29 @@ export const useMessagesStore = defineStore('messages', {
 
         // Staršie správy idú na začiatok poľa.
         this.messages.unshift(...page);
+        this.rememberMentions(page);
 
         // Menej ako plná stránka = došli sme na začiatok histórie.
         this.hasMore[channelId] = page.length === PAGE_SIZE;
       } finally {
         this.loading[channelId] = false;
+      }
+    },
+
+    // Zapamätá si, koho správy zmieňujú. Skutočný server by Mention záznamy poslal sám,
+    // tu ich dopočítame z textu. Iný store čítame podľa
+    // https://pinia.vuejs.org/core-concepts/actions.html#Accessing-other-stores-actions
+    rememberMentions(messages: Message[]): void {
+      const usersStore = useUsersStore();
+
+      for (const message of messages) {
+        for (const nickName of extractNickNames(message.content)) {
+          const user = usersStore.users.find(
+            (u) => u.nickName.toLowerCase() === nickName.toLowerCase(),
+          );
+          // Neexistujúci nick (preklep) nie je chyba, len ho ignorujeme.
+          if (user) this.mentions.push({ messageId: message.id, userId: user.id });
+        }
       }
     },
   },
