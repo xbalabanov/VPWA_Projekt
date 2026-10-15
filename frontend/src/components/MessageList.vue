@@ -41,6 +41,7 @@ import type { Message } from '../types/models';
 import { useChannelsStore } from '../stores/channels';
 import { useMessagesStore } from '../stores/messages';
 import MessageItem from './MessageItem.vue';
+import { useUsersStore } from '../stores/users';
 
 // Správy toho istého autora do 5 minút od seba spojíme do jednej skupiny.
 const GROUP_GAP_MS = 5 * 60 * 1000;
@@ -68,7 +69,7 @@ export default defineComponent({
 
   computed: {
     // Zdroj: https://pinia.vuejs.org/cookbook/options-api.html
-    ...mapStores(useChannelsStore, useMessagesStore),
+    ...mapStores(useChannelsStore, useMessagesStore, useUsersStore),
 
     channelMessages(): Message[] {
       const channelId = this.channelsStore.activeChannelId;
@@ -84,11 +85,25 @@ export default defineComponent({
       const channelId = this.channelsStore.activeChannelId;
       return channelId !== null && this.messagesStore.hasMoreFor(channelId);
     },
+
+    // id najnovšej načítanej správy; mení sa len keď pribudne správa dole.
+    lastMessageId(): number | null {
+      return this.channelMessages[this.channelMessages.length - 1]?.id ?? null;
+    },
   },
 
   watch: {
     'channelsStore.activeChannelId'() {
       void this.openChannel();
+    },
+
+    // Pribudla správa dole (odoslaná alebo prijatá).
+    lastMessageId(newId: number | null, oldId: number | null) {
+      if (newId === null || oldId === null || newId === oldId) return;
+
+      const last = this.channelMessages[this.channelMessages.length - 1];
+      const isMine = last?.authorId === this.usersStore.currentUserId;
+      if (isMine || this.isNearBottom()) this.scrollToBottom();
     },
   },
 
@@ -159,6 +174,13 @@ export default defineComponent({
       if (!current) return false;
       if (!previous) return true;
       return !isSameDay(new Date(current.createdAt), new Date(previous.createdAt));
+    },
+
+    // Je používateľ (skoro) úplne dole? Tolerancia 150 px.
+    isNearBottom(): boolean {
+      const scroller = this.$refs.scroller as HTMLElement | undefined;
+      if (!scroller) return true;
+      return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 150;
     },
   },
 });
