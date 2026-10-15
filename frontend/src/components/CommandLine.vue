@@ -3,10 +3,15 @@
      Príkazy rozpozná utils/commandParser.ts. -->
 <template>
   <div class="command-line">
-    <ul v-if="suggestions.length" class="command-suggestions" role="listbox" aria-label="Commands">
+    <ul
+      v-if="suggestions.length"
+      class="command-suggestions"
+      role="listbox"
+      aria-label="Suggestions"
+    >
       <li
         v-for="(suggestion, index) in suggestions"
-        :key="suggestion.name"
+        :key="suggestion.key"
         class="command-suggestion"
         :class="{ 'command-suggestion--active': index === activeSuggestion }"
         role="option"
@@ -14,7 +19,7 @@
         @mouseenter="activeSuggestion = index"
         @mousedown.prevent="pickSuggestion(index)"
       >
-        <code>{{ suggestion.usage }}</code>
+        <code>{{ suggestion.label }}</code>
       </li>
     </ul>
     <Transition name="command-note" mode="out-in">
@@ -57,7 +62,17 @@ import { defineComponent } from 'vue';
 import { mapStores } from 'pinia';
 import { useChannelsStore } from '../stores/channels';
 import { useMessagesStore } from '../stores/messages';
+import { useUsersStore } from '../stores/users';
 import { COMMAND_NAMES, commandUsage, parseInput, type CommandName } from '../utils/commandParser';
+
+// Jeden návrh v zozname nad políčkom.
+interface Suggestion {
+  key: string; // unikátny kľúč pre v-for
+  label: string; // čo sa zobrazí v zozname
+  text: string; // celý nový obsah políčka po výbere
+}
+
+const MAX_SUGGESTIONS = 8;
 
 export default defineComponent({
   name: 'CommandLine',
@@ -72,7 +87,7 @@ export default defineComponent({
   },
 
   computed: {
-    ...mapStores(useChannelsStore, useMessagesStore),
+    ...mapStores(useChannelsStore, useMessagesStore, useUsersStore),
 
     // Syntax príkazu, ktorý práve píšeš, napr. "/invite nickName". null = nič nepíšeš.
     hint(): string | null {
@@ -80,19 +95,14 @@ export default defineComponent({
       return parsed.command ? commandUsage(parsed.command) : null;
     },
 
-    // Návrhy príkazov, kým píšeš názov príkazu ("/", "/in"...). Prázdne pole = zoznam skrytý.
-    suggestions(): { name: CommandName; usage: string }[] {
-      const match = /^\/(\S*)$/.exec(this.text); // "/" a za ním zatiaľ žiadna medzera
-      if (!match) return [];
-
-      const typed = (match[1] ?? '').toLowerCase();
-      // Celý dopísaný príkaz už netreba ponúkať, Enter ho má odoslať.
-      if (COMMAND_NAMES.includes(typed as CommandName)) return [];
-
-      return COMMAND_NAMES.filter((name) => name.startsWith(typed)).map((name) => ({
-        name,
-        usage: commandUsage(name),
-      }));
+    // Návrhy podľa toho, čo práve píšeš; prvý typ, ktorý sedí, vyhráva. [] = zoznam skrytý.
+    suggestions(): Suggestion[] {
+      const list =
+        this.commandNameSuggestions() ??
+        this.commandArgSuggestions() ??
+        this.mentionSuggestions() ??
+        [];
+      return list.slice(0, MAX_SUGGESTIONS);
     },
   },
 
@@ -105,6 +115,72 @@ export default defineComponent({
   },
 
   methods: {
+    // "/" + začiatok názvu príkazu, napr. "/in".
+    commandNameSuggestions(): Suggestion[] | null {
+      const match = /^\/(\S*)$/.exec(this.text);
+      if (!match) return null;
+
+      const typed = (match[1] ?? '').toLowerCase();
+      if (COMMAND_NAMES.includes(typed as CommandName)) return []; // dopísaný, Enter odošle
+
+      return COMMAND_NAMES.filter((name) => name.startsWith(typed)).map((name) => ({
+        key: name,
+        label: commandUsage(name),
+        text: `/${name} `,
+      }));
+    },
+
+    // Argument príkazu s nickName: "/invite ja", "/kick ", "/revoke pe".
+    commandArgSuggestions(): Suggestion[] | null {
+      const match = /^\/(invite|revoke|kick)\s+(\S*)$/i.exec(this.text);
+      const channelId = this.channelsStore.activeChannelId;
+      if (!match || channelId === null) return null;
+
+      const command = (match[1] ?? '').toLowerCase();
+      const members = this.channelsStore.membersOf(channelId);
+      const myId = this.usersStore.currentUserId;
+
+      // /invite -> ľudia, ktorí v kanáli ešte nie sú; /kick a /revoke -> členovia okrem mňa.
+      const candidates =
+        command === 'invite'
+          ? this.usersStore.users.map((u) => u.id).filter((id) => !members.includes(id))
+          : members.filter((id) => id !== myId);
+
+      return this.nickSuggestions(candidates, match[2] ?? '', (nick) => `/${command} ${nick}`);
+    },
+
+    // Zmienka na konci textu: "ahoj @ja".
+    mentionSuggestions(): Suggestion[] | null {
+      const match = /(^|\s)@([A-Za-z0-9_.-]*)$/.exec(this.text);
+      const channelId = this.channelsStore.activeChannelId;
+      if (!match || channelId === null) return null;
+
+      const typed = match[2] ?? '';
+      const before = this.text.slice(0, this.text.length - typed.length - 1); // text pred "@"
+      const myId = this.usersStore.currentUserId;
+      const members = this.channelsStore.membersOf(channelId).filter((id) => id !== myId);
+
+      return this.nickSuggestions(members, typed, (nick) => `${before}@${nick} `);
+    },
+
+    // Používatelia z `userIds`, ktorých nick začína `typed`, ako návrhy (podľa abecedy).
+    nickSuggestions(
+      userIds: number[],
+      typed: string,
+      toText: (nick: string) => string,
+    ): Suggestion[] {
+      const lower = typed.toLowerCase();
+      const nicks = userIds
+        .map((id) => this.usersStore.userById(id)?.nickName)
+        .filter(
+          (nick): nick is string => nick !== undefined && nick.toLowerCase().startsWith(lower),
+        )
+        .sort((a, b) => a.localeCompare(b));
+
+      if (nicks.some((nick) => nick.toLowerCase() === lower)) return []; // dopísaný, Enter odošle
+      return nicks.map((nick) => ({ key: nick, label: `@${nick}`, text: toText(nick) }));
+    },
+
     // Klávesy v políčku: šípky/Tab/Enter ovládajú zoznam návrhov, inak Enter odošle.
     onKeydown(event: KeyboardEvent): void {
       if (event.isComposing) return; // písanie diakritiky cez IME, Enter ešte nie je "odoslať"
@@ -130,10 +206,10 @@ export default defineComponent({
       }
     },
 
-    // Doplní vybraný príkaz do políčka, kurzor je pripravený na argumenty.
+    // Nahradí text políčka vybraným návrhom.
     pickSuggestion(index: number): void {
       const suggestion = this.suggestions[index];
-      if (suggestion) this.text = `/${suggestion.name} `;
+      if (suggestion) this.text = suggestion.text;
     },
 
     async submit(): Promise<void> {
