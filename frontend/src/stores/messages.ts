@@ -11,6 +11,15 @@ interface MessagesState {
   hasMore: Record<number, boolean>; // channelId -> sú na serveri ešte staršie správy?
   loading: Record<number, boolean>; // channelId -> práve načítavame?
   mentions: Mention[]; // koho ktorá načítaná správa zmieňuje (@nickname)
+  drafts: Draft[]; // kto práve čo píše (zatiaľ len ja, neskôr aj ostatní cez WebSocket)
+}
+
+// Rozpísaná (ešte neodoslaná) správa pre "X is typing" (UC 11).
+// Nie je v models.ts, lebo sa neukladá do databázy – je to len dočasný stav.
+export interface Draft {
+  channelId: number;
+  userId: number;
+  text: string;
 }
 
 // --- Generovanie falošnej histórie (dosť správ aj na neskorší infinite scroll) ---
@@ -129,6 +138,7 @@ export const useMessagesStore = defineStore('messages', {
     hasMore: {},
     loading: {},
     mentions: [],
+    drafts: [],
   }),
 
   getters: {
@@ -150,6 +160,12 @@ export const useMessagesStore = defineStore('messages', {
       (state) =>
       (messageId: number, userId: number): boolean =>
         state.mentions.some((m) => m.messageId === messageId && m.userId === userId),
+
+    // Kto práve píše v kanáli (UC 11).
+    draftsIn:
+      (state) =>
+      (channelId: number): Draft[] =>
+        state.drafts.filter((d) => d.channelId === channelId),
   },
 
   actions: {
@@ -208,6 +224,15 @@ export const useMessagesStore = defineStore('messages', {
           if (user) this.mentions.push({ messageId: message.id, userId: user.id });
         }
       }
+    },
+
+    // Nastaví môj rozpísaný text v kanáli; prázdny text = už nepíšem.
+    setDraft(channelId: number, text: string): void {
+      const userId = useUsersStore().currentUserId;
+      if (userId === null) return;
+
+      this.drafts = this.drafts.filter((d) => !(d.channelId === channelId && d.userId === userId));
+      if (text.trim()) this.drafts.push({ channelId, userId, text });
     },
   },
 });

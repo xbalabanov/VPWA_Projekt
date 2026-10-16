@@ -3,6 +3,7 @@
      Príkazy rozpozná utils/commandParser.ts. -->
 <template>
   <div class="command-line">
+    <TypingIndicator />
     <ul
       v-if="suggestions.length"
       class="command-suggestions"
@@ -65,6 +66,7 @@ import { useMessagesStore } from '../stores/messages';
 import { useUsersStore } from '../stores/users';
 import { COMMAND_NAMES, commandUsage, parseInput, type CommandName } from '../utils/commandParser';
 import { executeCommand } from '../utils/commandHandlers';
+import TypingIndicator from './TypingIndicator.vue';
 
 // Jeden návrh v zozname nad políčkom.
 interface Suggestion {
@@ -77,6 +79,7 @@ const MAX_SUGGESTIONS = 8;
 
 export default defineComponent({
   name: 'CommandLine',
+  components: { TypingIndicator },
 
   data() {
     return {
@@ -112,6 +115,13 @@ export default defineComponent({
     text() {
       this.error = null;
       this.activeSuggestion = 0; // nový text = nový zoznam, výber od začiatku
+      this.updateDraft();
+    },
+
+    // Pri prepnutí kanála už v starom nepíšem, v novom áno (ak je niečo v políčku).
+    'channelsStore.activeChannelId'(newId: number | null, oldId: number | null) {
+      if (oldId !== null) this.messagesStore.setDraft(oldId, '');
+      if (newId !== null) this.updateDraft();
     },
   },
 
@@ -245,6 +255,15 @@ export default defineComponent({
       } finally {
         this.sending = false;
       }
+    },
+
+    // UC 11: rozpísaná správa je viditeľná ako "X is typing". Príkazy nie, tie sú len moje.
+    updateDraft(): void {
+      const channelId = this.channelsStore.activeChannelId;
+      if (channelId === null) return;
+
+      const isCommand = this.text.trimStart().startsWith('/');
+      this.messagesStore.setDraft(channelId, isCommand ? '' : this.text);
     },
   },
 });
