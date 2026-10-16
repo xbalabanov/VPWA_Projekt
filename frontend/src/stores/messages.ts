@@ -5,6 +5,7 @@ import { defineStore } from 'pinia';
 import type { Mention, Message } from '../types/models';
 import { useUsersStore } from './users';
 import { extractNickNames } from '../utils/mentions';
+import { Notify } from 'quasar';
 
 interface MessagesState {
   messages: Message[]; // načítané správy; v rámci kanála od najstaršej po najnovšiu
@@ -206,6 +207,7 @@ export const useMessagesStore = defineStore('messages', {
       const message = await postMessage(channelId, authorId, text);
       this.messages.push(message); // nová správa ide na koniec (je najnovšia)
       this.rememberMentions([message]);
+      this.notifyAboutMessage(message);
       return null;
     },
 
@@ -233,6 +235,25 @@ export const useMessagesStore = defineStore('messages', {
 
       this.drafts = this.drafts.filter((d) => !(d.channelId === channelId && d.userId === userId));
       if (text.trim()) this.drafts.push({ channelId, userId, text });
+    },
+
+    // UC 8 (ukážka v prototype): notifikácia o správe, ktorá ma zmieňuje (@nickname).
+    // V 2. fáze sa zavolá pri prijatí cudzej správy a len keď appka nie je viditeľná.
+    notifyAboutMessage(message: Message): void {
+      const me = useUsersStore().currentUser;
+      if (!me || me.status === 'dnd') return; // UC 9: DND -> bez notifikácií
+      if (!this.isMentioned(message.id, me.id)) return;
+
+      const author = useUsersStore().userById(message.authorId)?.nickName ?? 'Someone';
+      const snippet =
+        message.content.length > 80 ? `${message.content.slice(0, 80)}…` : message.content;
+
+      Notify.create({
+        message: author,
+        caption: snippet,
+        icon: 'alternate_email',
+        position: 'top-right',
+      });
     },
   },
 });
