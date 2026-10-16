@@ -250,3 +250,41 @@ src/mock/simulator.ts
 Simulator bude neskôr možné nahradiť WebSocket vrstvou bez nutnosti meniť komponenty.
 
 ⸻
+
+Stav prác (15. 10. 2026)
+
+Stanislav – všetky UC hotové (A1–A8)
+
+* UC1 – hotové (na main)
+    * login, logout, route guard
+    * registrácia: kontrola obsadeného nickName a emailu už počas písania (bez ohľadu na veľké/malé písmená)
+* UC2 – hotové (na main)
+    * channel store gettery: myInvitations, channelByName, isMember, isAdmin, isBanned
+    * channel store akcie: createChannel, deleteChannel, leaveChannel (správca → kanál zaniká), acceptInvitation, declineInvitation, selectFirstChannel
+    * ChannelList: pozvánky zvýraznené a navrchu, menu opustiť / zrušiť (iba správca, s potvrdením), dialóg na vytvorenie kanála
+    * 30-dňový zánik kanála odložený na backend (fáza 2)
+* UC4 – hotové (otvorený PR z feature/stanislav-channels)
+    * akcie joinChannel, inviteUser, revokeUser, kickUser (správca → okamžitý ban, inak 3 hlasy = ban), pomocné banUser, removeMember
+    * users store: getter userByNickName
+* UC4, UC5 – hotové (ten istý PR)
+    * utils/commandHandlers.ts: executeCommand(parsed) vracia null alebo text chyby
+    * /join, /invite, /revoke, /kick, /cancel (správca → kanál zaniká), /quit (iba správca)
+    * CommandLine.vue volá executeCommand
+* UC10 – hotové (ten istý PR)
+    * MembersList: členovia aktívneho kanála, stav (online/DND/offline), označenie správcu
+    * /list otvorí panel členov (iba pre člena); panel ovláda channelsStore.membersOpen (MainLayout)
+
+Maksym
+
+* UC3 (B1), UC7 (B2, B7), UC6 (B3) – hotové (na main)
+* chýba: UC11 (B4 typing), UC9 (B5 stav), UC8 (B6 notifikácie), B8 realtime mock
+
+Ďalej
+
+* zlúčiť PR feature/stanislav-channels do main
+* dohodnúť s Maksymom rozdelenie zvyšku – návrh: Stanislav berie UC9 (B5) a synchronizáciu medzi oknami
+    * sync: stav storov v localStorage + udalosť storage, currentUserId v sessionStorage (každá karta iný používateľ)
+* drobnosti: tlačidlo „Log in“ je o kúsok širšie ako polia (q-gutter-md); preklepy v channels.ts (pozvnaku, kanály, Nie su)
+* termín odovzdania 1. fázy: 18. 10. 2026
+
+⸻

@@ -89,6 +89,11 @@ export const useUsersStore = defineStore('users', {
       (state) =>
       (nickName: string): boolean =>
         state.users.some((u) => u.nickName.toLowerCase() === nickName.toLowerCase()),
+
+    userByNickName:
+      (state) =>
+      (nickName: string): User | undefined =>
+        state.users.find((u) => u.nickName.toLowerCase() === nickName.toLowerCase()),
   },
 
   actions: {

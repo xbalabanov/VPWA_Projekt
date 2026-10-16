@@ -64,6 +64,7 @@ import { useChannelsStore } from '../stores/channels';
 import { useMessagesStore } from '../stores/messages';
 import { useUsersStore } from '../stores/users';
 import { COMMAND_NAMES, commandUsage, parseInput, type CommandName } from '../utils/commandParser';
+import { executeCommand } from '../utils/commandHandlers';
 
 // Jeden návrh v zozname nad políčkom.
 interface Suggestion {
@@ -224,8 +225,9 @@ export default defineComponent({
       }
 
       if (parsed.kind === 'command') {
-        // Vykonanie príkazov patrí osobe A (commandHandlers.ts), zatiaľ len oznam.
-        this.error = `/${parsed.command} is not implemented yet`;
+        const error = executeCommand(parsed);
+        if (error) this.error = error;
+        else this.text = '';
         return;
       }
 

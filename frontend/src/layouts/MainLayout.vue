@@ -29,9 +29,9 @@
           flat
           round
           icon="group"
-          :aria-pressed="rightDrawerOpen"
+          :aria-pressed="channelsStore.membersOpen"
           aria-label="Toggle member panel"
-          @click="rightDrawerOpen = !rightDrawerOpen"
+          @click="channelsStore.membersOpen = !channelsStore.membersOpen"
         />
         <q-btn
           flat
@@ -79,7 +79,7 @@
     </q-drawer>
 
     <q-drawer
-      v-model="rightDrawerOpen"
+      v-model="channelsStore.membersOpen"
       side="right"
       show-if-above
       class="side-panel"
@@ -119,7 +119,6 @@ export default defineComponent({
   data() {
     return {
       leftDrawerOpen: false,
-      rightDrawerOpen: false,
     };
   },
 
