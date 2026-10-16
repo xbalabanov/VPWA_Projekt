@@ -2,7 +2,7 @@
 // Spoločný základ: falošní používatelia a jednoduché vyhľadávanie. Akcie (prihlásenie,
 // zmena stavu, nastavenie notifikácií) pribudnú v úlohách A1, A7, B5 a B6.
 import { defineStore } from 'pinia';
-import type { User } from '../types/models';
+import type { User, UserStatus } from '../types/models';
 
 interface UsersState {
   users: User[];
@@ -133,6 +133,18 @@ export const useUsersStore = defineStore('users', {
 
     logout(): void {
       this.currentUserId = null;
+    },
+
+    // Zmena stavu prihláseného používateľa (UC 9). Ostatní ho uvidia v zozname členov.
+    setStatus(status: UserStatus): void {
+      const me = this.currentUser;
+      if (me) me.status = status;
+    },
+
+    // UC 8: notifikácie iba pre správy, ktoré ma zmieňujú (@nickname).
+    setNotifyMentionsOnly(value: boolean): void {
+      const me = this.currentUser;
+      if (me) me.notifyMentionsOnly = value;
     },
   },
 });

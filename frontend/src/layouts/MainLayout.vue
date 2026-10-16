@@ -62,17 +62,7 @@
         <q-space />
 
         <div v-if="usersStore.currentUser" class="me">
-          <q-avatar
-            size="34px"
-            font-size="12px"
-            class="user-avatar"
-            :style="{ '--hue': avatarHue(usersStore.currentUser.id) }"
-          >
-            {{ initials(usersStore.currentUser.firstName, usersStore.currentUser.lastName) }}
-          </q-avatar>
-          <div class="me-name">
-            {{ usersStore.currentUser.firstName }} {{ usersStore.currentUser.lastName }}
-          </div>
+          <UserMenu />
           <q-btn flat round dense icon="logout" aria-label="Log out" @click="logout" />
         </div>
       </nav>
@@ -106,15 +96,15 @@ import { defineComponent } from 'vue';
 import { mapStores } from 'pinia';
 import { useChannelsStore } from '../stores/channels';
 import { useUsersStore } from '../stores/users';
-import { avatarHue, initials } from '../utils/avatar';
 import ChannelList from '../components/ChannelList.vue';
 import CommandLine from '../components/CommandLine.vue';
 import MembersList from '../components/MembersList.vue';
+import UserMenu from '../components/UserMenu.vue';
 
 export default defineComponent({
   name: 'MainLayout',
 
-  components: { ChannelList, CommandLine, MembersList },
+  components: { ChannelList, CommandLine, MembersList, UserMenu },
 
   data() {
     return {
@@ -129,9 +119,6 @@ export default defineComponent({
   },
 
   methods: {
-    avatarHue,
-    initials,
-
     onChannelSelected(): void {
       // Na mobile sa panel s kanálmi po výbere zavrie, aby bolo vidno správy.
       if (this.$q.screen.lt.md) this.leftDrawerOpen = false;
@@ -233,14 +220,7 @@ export default defineComponent({
   padding: 12px 8px 4px;
   border-top: 1px solid var(--border);
 }
-.me-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .me .q-btn {
   color: var(--text-muted);
 }

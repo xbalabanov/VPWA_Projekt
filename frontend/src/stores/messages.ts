@@ -5,12 +5,22 @@ import { defineStore } from 'pinia';
 import type { Mention, Message } from '../types/models';
 import { useUsersStore } from './users';
 import { extractNickNames } from '../utils/mentions';
+import { Notify } from 'quasar';
 
 interface MessagesState {
   messages: Message[]; // načítané správy; v rámci kanála od najstaršej po najnovšiu
   hasMore: Record<number, boolean>; // channelId -> sú na serveri ešte staršie správy?
   loading: Record<number, boolean>; // channelId -> práve načítavame?
   mentions: Mention[]; // koho ktorá načítaná správa zmieňuje (@nickname)
+  drafts: Draft[]; // kto práve čo píše (zatiaľ len ja, neskôr aj ostatní cez WebSocket)
+}
+
+// Rozpísaná (ešte neodoslaná) správa pre "X is typing" (UC 11).
+// Nie je v models.ts, lebo sa neukladá do databázy – je to len dočasný stav.
+export interface Draft {
+  channelId: number;
+  userId: number;
+  text: string;
 }
 
 // --- Generovanie falošnej histórie (dosť správ aj na neskorší infinite scroll) ---
@@ -129,6 +139,7 @@ export const useMessagesStore = defineStore('messages', {
     hasMore: {},
     loading: {},
     mentions: [],
+    drafts: [],
   }),
 
   getters: {
@@ -150,6 +161,12 @@ export const useMessagesStore = defineStore('messages', {
       (state) =>
       (messageId: number, userId: number): boolean =>
         state.mentions.some((m) => m.messageId === messageId && m.userId === userId),
+
+    // Kto práve píše v kanáli (UC 11).
+    draftsIn:
+      (state) =>
+      (channelId: number): Draft[] =>
+        state.drafts.filter((d) => d.channelId === channelId),
   },
 
   actions: {
@@ -190,6 +207,7 @@ export const useMessagesStore = defineStore('messages', {
       const message = await postMessage(channelId, authorId, text);
       this.messages.push(message); // nová správa ide na koniec (je najnovšia)
       this.rememberMentions([message]);
+      this.notifyAboutMessage(message);
       return null;
     },
 
@@ -208,6 +226,34 @@ export const useMessagesStore = defineStore('messages', {
           if (user) this.mentions.push({ messageId: message.id, userId: user.id });
         }
       }
+    },
+
+    // Nastaví môj rozpísaný text v kanáli; prázdny text = už nepíšem.
+    setDraft(channelId: number, text: string): void {
+      const userId = useUsersStore().currentUserId;
+      if (userId === null) return;
+
+      this.drafts = this.drafts.filter((d) => !(d.channelId === channelId && d.userId === userId));
+      if (text.trim()) this.drafts.push({ channelId, userId, text });
+    },
+
+    // UC 8 (ukážka v prototype): notifikácia o správe, ktorá ma zmieňuje (@nickname).
+    // V 2. fáze sa zavolá pri prijatí cudzej správy a len keď appka nie je viditeľná.
+    notifyAboutMessage(message: Message): void {
+      const me = useUsersStore().currentUser;
+      if (!me || me.status === 'dnd') return; // UC 9: DND -> bez notifikácií
+      if (!this.isMentioned(message.id, me.id)) return;
+
+      const author = useUsersStore().userById(message.authorId)?.nickName ?? 'Someone';
+      const snippet =
+        message.content.length > 80 ? `${message.content.slice(0, 80)}…` : message.content;
+
+      Notify.create({
+        message: author,
+        caption: snippet,
+        icon: 'alternate_email',
+        position: 'top-right',
+      });
     },
   },
 });
