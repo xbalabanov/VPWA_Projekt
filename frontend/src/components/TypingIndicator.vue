@@ -16,12 +16,12 @@
           </button>
           <span v-if="index < drafts.length - 1">,</span>
         </template>
-        <span>{{ drafts.length === 1 ? 'is typing…' : 'are typing…' }}</span>
+        <span>{{ drafts.length === 1 ? 'píše…' : 'píšu…' }}</span>
       </template>
     </div>
 
     <div v-if="openDraft" class="typing-preview">
-      <div class="typing-preview-label">{{ nickName(openDraft.userId) }} is writing:</div>
+      <div class="typing-preview-label">{{ nickName(openDraft.userId) }} práve píše:</div>
       <p class="typing-preview-text">
         {{ openDraft.text }}<span class="typing-caret" aria-hidden="true" />
       </p>
@@ -61,7 +61,7 @@ export default defineComponent({
 
   methods: {
     nickName(userId: number): string {
-      return this.usersStore.userById(userId)?.nickName ?? 'Someone';
+      return this.usersStore.userById(userId)?.nickName ?? 'Niekto';
     },
 
     toggle(userId: number): void {

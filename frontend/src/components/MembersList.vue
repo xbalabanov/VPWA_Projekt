@@ -1,8 +1,8 @@
 <!-- Zoznam členov aktívneho kanála (UC 10).
        Vlastník: Stanislav (A6). -->
 <template>
-  <section aria-label="Members">
-    <div class="section-label">Members – {{ members.length }}</div>
+  <section aria-label="Členovia">
+    <div class="section-label">Členovia – {{ members.length }}</div>
     <q-list>
       <q-item v-for="user in members" :key="user.id" class="member-item">
         <q-item-section avatar>
@@ -27,7 +27,7 @@
               name="star"
               size="14px"
               class="member-admin"
-              aria-label="Admin"
+              aria-label="Správca"
             />
           </q-item-label>
           <q-item-label caption class="member-status">{{ statusLabel(user.status) }}</q-item-label>
@@ -47,7 +47,7 @@ import { avatarHue, initials } from '../utils/avatar';
 
 const STATUS_LABELS: Record<UserStatus, string> = {
   online: 'Online',
-  dnd: 'Do not disturb',
+  dnd: 'Nerušiť',
   offline: 'Offline',
 };
 

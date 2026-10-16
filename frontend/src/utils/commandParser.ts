@@ -45,7 +45,7 @@ export function parseInput(raw: string): ParsedInput {
   const name = rawName.toLowerCase();
 
   if (!isCommandName(name)) {
-    return { kind: 'command', args, text, error: `Unknown command: /${rawName}` };
+    return { kind: 'command', args, text, error: `Neznámy príkaz: /${rawName}` };
   }
 
   const spec = COMMANDS[name];
@@ -54,7 +54,7 @@ export function parseInput(raw: string): ParsedInput {
   const wrongFlag = name === 'join' && args.length === 2 && args[1]?.toLowerCase() !== 'private';
 
   if (wrongCount || wrongFlag) {
-    return { kind: 'command', command: name, args, text, error: `Usage: ${spec.usage}` };
+    return { kind: 'command', command: name, args, text, error: `Použitie: ${spec.usage}` };
   }
 
   return { kind: 'command', command: name, args, text };

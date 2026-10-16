@@ -1,7 +1,7 @@
 <template>
   <section>
-    <h1 class="auth-title">Log in</h1>
-    <p class="auth-subtitle">Welcome back. Your channels are waiting.</p>
+    <h1 class="auth-title">Prihlásenie</h1>
+    <p class="auth-subtitle">Prihlás sa a pokračuj v rozhovoroch.</p>
 
     <q-form @submit="onSubmit" class="q-gutter-md">
       <q-input
@@ -11,7 +11,7 @@
         outlined
         :rules="[
           (val) => !!val || 'Zadaj email',
-          (val) => val.includes('@') || 'Email musi obsahovat @',
+          (val) => val.includes('@') || 'Email musí obsahovať @',
         ]"
       />
 
@@ -23,10 +23,10 @@
         :rules="[(val) => val.length >= 6 || 'Aspoň 6 znakov']"
       />
 
-      <q-btn unelevated no-caps class="auth-submit" label="Log in" type="submit" />
+      <q-btn unelevated no-caps class="auth-submit" label="Prihlásiť sa" type="submit" />
     </q-form>
 
-    <p class="auth-switch">New here? <router-link to="/register">Create an account</router-link></p>
+    <p class="auth-switch">Nemáš účet? <router-link to="/register">Zaregistruj sa</router-link></p>
   </section>
 </template>
 
@@ -49,7 +49,7 @@ export default defineComponent({
     onSubmit() {
       const ok = useUsersStore().login(this.email, this.password);
       if (!ok) {
-        this.$q.notify({ message: 'Invalid name or password', color: 'negative' });
+        this.$q.notify({ message: 'Nesprávny email alebo heslo', color: 'negative' });
         return;
       }
       this.$q.notify({ message: 'Prihlásený', color: 'positive' });

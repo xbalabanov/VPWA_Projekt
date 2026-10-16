@@ -1,7 +1,7 @@
 <!-- Prihlásený používateľ: zmena stavu (UC 9) a nastavenie notifikácií (UC 8).
      Vlastník: Maksym (B5, B6). -->
 <template>
-  <q-btn v-if="me" flat no-caps class="user-menu" aria-label="Status and notification settings">
+  <q-btn v-if="me" flat no-caps class="user-menu" aria-label="Stav a nastavenie notifikácií">
     <span class="user-menu-avatar">
       <q-avatar
         size="34px"
@@ -20,7 +20,25 @@
 
     <q-menu anchor="top left" self="bottom left" :offset="[0, 8]">
       <q-list dense class="user-menu-list">
-        <q-item-label header>Status</q-item-label>
+        <!-- Kto som: rovnaké údaje, aké vidia ostatní (nick používajú v @zmienkach). -->
+        <div class="user-menu-head">
+          <q-avatar
+            size="40px"
+            font-size="14px"
+            class="user-avatar"
+            :style="{ '--hue': avatarHue(me.id) }"
+          >
+            {{ initials(me.firstName, me.lastName) }}
+          </q-avatar>
+          <div class="user-menu-head-text">
+            <div class="user-menu-name">{{ me.firstName }} {{ me.lastName }}</div>
+            <div class="user-menu-nick">@{{ me.nickName }}</div>
+          </div>
+        </div>
+
+        <q-separator />
+
+        <q-item-label header>Stav</q-item-label>
         <q-item
           v-for="option in statusOptions"
           :key="option.value"
@@ -37,14 +55,22 @@
             <q-item-label>{{ option.label }}</q-item-label>
             <q-item-label caption>{{ option.hint }}</q-item-label>
           </q-item-section>
+          <!-- Aktívny stav má aj fajku, nie len farbu (prístupnosť). -->
+          <q-item-section v-if="me.status === option.value" side>
+            <q-icon name="check" size="18px" class="user-menu-check" />
+          </q-item-section>
         </q-item>
 
         <q-separator />
 
+        <q-item-label header>Notifikácie</q-item-label>
         <q-item tag="label">
+          <q-item-section avatar>
+            <q-icon name="alternate_email" size="18px" />
+          </q-item-section>
           <q-item-section>
-            <q-item-label>Notify only mentions</q-item-label>
-            <q-item-label caption>Only messages with @{{ me.nickName }}</q-item-label>
+            <q-item-label>Iba adresované správy</q-item-label>
+            <q-item-label caption>Len správy s @{{ me.nickName }}</q-item-label>
           </q-item-section>
           <q-item-section side>
             <q-toggle :model-value="me.notifyMentionsOnly" @update:model-value="setMentionsOnly" />
@@ -64,9 +90,9 @@ import { avatarHue, initials } from '../utils/avatar';
 
 // Stavy podľa UC 9 a čo pre používateľa znamenajú.
 const STATUS_OPTIONS: { value: UserStatus; label: string; hint: string }[] = [
-  { value: 'online', label: 'Online', hint: 'Messages and notifications' },
-  { value: 'dnd', label: 'Do not disturb', hint: 'No notifications' },
-  { value: 'offline', label: 'Offline', hint: 'No new messages' },
+  { value: 'online', label: 'Online', hint: 'Správy aj notifikácie' },
+  { value: 'dnd', label: 'Nerušiť', hint: 'Bez notifikácií' },
+  { value: 'offline', label: 'Offline', hint: 'Neprichádzajú nové správy' },
 ];
 
 export default defineComponent({
@@ -136,11 +162,27 @@ export default defineComponent({
 }
 
 .user-menu-list {
-  min-width: 240px;
+  min-width: 260px;
+}
+.user-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 12px;
+}
+.user-menu-head-text {
+  min-width: 0;
+}
+.user-menu-nick {
+  color: var(--text-subtle);
+  font-size: 0.8125rem;
 }
 .user-menu-active {
   background: var(--accent-soft);
   color: var(--text);
+}
+.user-menu-check {
+  color: var(--accent);
 }
 
 /* Rovnaká bodka stavu ako v MembersList (okraj vo farbe panelu ju oddelí od avatara). */

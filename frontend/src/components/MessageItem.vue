@@ -16,12 +16,12 @@
     </q-avatar>
     <!-- V kompaktnej správe je miesto avatara prázdne, aby text lícoval so skupinou.
          Pri prejdení myšou sa tam ukáže čas. -->
-    <time v-else class="message-gutter-time" :datetime="message.createdAt">{{ time }}</time>
+    <time v-else class="message-gutter-time tabular" :datetime="message.createdAt">{{ time }}</time>
 
     <div class="message-body">
       <div v-if="!compact" class="message-meta">
         <span class="message-author">{{ authorName }}</span>
-        <time class="message-time" :datetime="message.createdAt">{{ time }}</time>
+        <time class="message-time tabular" :datetime="message.createdAt">{{ time }}</time>
       </div>
       <p class="message-text">
         <template v-for="(part, index) in contentParts" :key="index">
@@ -71,7 +71,7 @@ export default defineComponent({
     },
 
     authorName(): string {
-      return this.author?.nickName ?? 'Unknown user';
+      return this.author?.nickName ?? 'Neznámy používateľ';
     },
 
     authorInitials(): string {
@@ -79,7 +79,7 @@ export default defineComponent({
     },
 
     time(): string {
-      return new Date(this.message.createdAt).toLocaleTimeString([], {
+      return new Date(this.message.createdAt).toLocaleTimeString('sk-SK', {
         hour: '2-digit',
         minute: '2-digit',
       });
@@ -118,9 +118,14 @@ export default defineComponent({
 .message {
   display: flex;
   gap: 12px;
-  margin-top: 16px;
-  padding: 6px 8px 3px;
-  border-radius: 8px;
+  margin-top: 14px;
+  padding: 6px 12px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  transition: background-color 150ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+.message:hover {
+  background: var(--hover);
 }
 .message-body {
   min-width: 0;
@@ -132,11 +137,12 @@ export default defineComponent({
   gap: 8px;
 }
 .message-author {
+  font-size: 0.875rem;
   font-weight: 650;
 }
 .message-time {
   color: var(--text-subtle);
-  font-size: 0.75rem;
+  font-size: 0.71875rem;
 }
 .message-text {
   max-width: 72ch;
@@ -151,9 +157,6 @@ export default defineComponent({
   margin-top: 0;
   padding-top: 1px;
   padding-bottom: 1px;
-}
-.message:hover {
-  background: var(--surface);
 }
 
 /* Prázdne miesto namiesto avatara (rovnaká šírka 36px). Čas je skrytý, kým nie je hover. */
@@ -170,30 +173,33 @@ export default defineComponent({
   visibility: visible;
 }
 
-/* Moje správy: jemné pozadie a pásik vľavo. */
+/* Moje správy: len jemné podfarbenie celého riadku (bez bočného pásika). */
 .message--own {
-  border-radius: 0;
-  background: color-mix(in oklch, var(--accent-soft) 30%, transparent);
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-.message--own:hover {
-  background: var(--accent-soft);
+  background: color-mix(in oklch, var(--accent-soft) 35%, transparent);
 }
 
-/* Zmienka @nickname v texte. Moja zmienka má farbu zmienok, cudzia farbu akcentu. */
+/* Zmienka @nickname v texte: moja vo farbe zmienok, cudzia v akcente, obe ako štítok. */
 .mention {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
 }
 .mention--me {
+  background: color-mix(in oklch, var(--mention-text) 18%, transparent);
   color: var(--mention-text);
 }
 
-/* Celá správa adresovaná mne (UC 6): výrazné pozadie, aby sa nedala prehliadnuť. */
+/* Celá správa adresovaná mne (UC 6): teplé pozadie a jemný rámik, aby sa nedala prehliadnuť. */
 .message--mention {
-  border-radius: 0;
+  border-color: color-mix(in oklch, var(--mention-text) 25%, transparent);
   background: var(--mention-bg);
-  box-shadow: inset 2px 0 0 var(--mention-text);
+}
+
+/* :hover pravidlá sú za základnými, pri rovnakej špecificite vyhrá neskoršie. */
+.message--own:hover {
+  background: color-mix(in oklch, var(--accent-soft) 60%, transparent);
 }
 .message--mention:hover {
   background: color-mix(in oklch, var(--mention-bg) 85%, var(--mention-text));
@@ -202,6 +208,8 @@ export default defineComponent({
 @media (max-width: 599px) {
   .message {
     gap: 10px;
+    padding-right: 8px;
+    padding-left: 8px;
   }
 }
 </style>

@@ -199,7 +199,7 @@ export const useMessagesStore = defineStore('messages', {
     // Vráti chybu ako text, alebo null pri úspechu.
     async sendMessage(channelId: number, content: string): Promise<string | null> {
       const authorId = useUsersStore().currentUserId;
-      if (authorId === null) return 'You are not logged in';
+      if (authorId === null) return 'Nie si prihlásený';
 
       const text = content.trim();
       if (!text) return null; // prázdnu správu ticho ignorujeme
@@ -244,7 +244,7 @@ export const useMessagesStore = defineStore('messages', {
       if (!me || me.status === 'dnd') return; // UC 9: DND -> bez notifikácií
       if (!this.isMentioned(message.id, me.id)) return;
 
-      const author = useUsersStore().userById(message.authorId)?.nickName ?? 'Someone';
+      const author = useUsersStore().userById(message.authorId)?.nickName ?? 'Niekto';
       const snippet =
         message.content.length > 80 ? `${message.content.slice(0, 80)}…` : message.content;
 
