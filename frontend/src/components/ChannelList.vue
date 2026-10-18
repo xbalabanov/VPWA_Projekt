@@ -17,7 +17,7 @@
           <q-icon name="mail" size="16px" class="invite-icon" />
           <span class="invite-name">{{ channelName(invitation.channelId) }}</span>
         </div>
-        <div class="invite-from">from {{ nickName(invitation.invitedById) }}</div>
+        <div class="invite-from">od {{ nickName(invitation.invitedById) }}</div>
         <div class="invite-actions">
           <q-btn
             unelevated
@@ -191,7 +191,7 @@ export default defineComponent({
 
     // Kto pozval (pozvánka má iba id používateľa).
     nickName(userId: number): string {
-      return this.usersStore.userById(userId)?.nickName ?? 'someone';
+      return this.usersStore.userById(userId)?.nickName ?? 'niekto';
     },
 
     // Pozvánka má iba channelId, názov si dohľadáme.

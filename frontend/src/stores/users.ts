@@ -116,7 +116,7 @@ export const useUsersStore = defineStore('users', {
     }): string | null {
       //email a nickname musia byt unikat (formular to kontroluje tiez, toto je poistka - store sa nemoze spoliehat len na UI)
       if (this.isEmailTaken(data.email)) return 'Email je už použitý';
-      if (this.isNickNameTaken(data.nickName)) return 'NickName je už obsadený';
+      if (this.isNickNameTaken(data.nickName)) return 'Tento nick je už obsadený';
       const email = data.email.trim().toLowerCase();
 
       //nové id = najvacsie + 1 nez spravime databazu
