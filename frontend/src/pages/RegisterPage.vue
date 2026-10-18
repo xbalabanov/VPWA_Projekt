@@ -36,7 +36,7 @@
         :rules="[
           (val) => !!val || 'Zadaj nick',
           // bez medzier a @, aby neskôr fungovalo @nickname aj /invite nickName
-          (val) => /^[A-Za-z0-9_.-]+$/.test(val) || 'Iba písmená, čísla, _ . -',
+          (val) => isValidNickName(val) || 'Iba pismena, cisla, _ . - (nesmie koncit . ani -)',
           (val) => !usersStore.isNickNameTaken(val) || 'Tento nick je už obsadený',
         ]"
       />
@@ -87,6 +87,7 @@ import { defineComponent } from 'vue';
 import { mapStores } from 'pinia';
 import { useUsersStore } from '../stores/users';
 import { useChannelsStore } from '../stores/channels';
+import { NICK_NAME_PATTERN } from '../utils/mentions';
 
 export default defineComponent({
   name: 'RegisterPage',
@@ -108,6 +109,11 @@ export default defineComponent({
   },
 
   methods: {
+    //rovnaky vzor ako pri @zmienkach, inak by sa niektori pouzivatelia nedali zmienit
+    isValidNickName(val: string): boolean {
+      return NICK_NAME_PATTERN.test(val);
+    },
+
     onSubmit() {
       // passwordAgain do store neposielame, slúži iba na kontrolu vo formulári
       const error = this.usersStore.register({

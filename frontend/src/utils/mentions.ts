@@ -8,9 +8,16 @@ export interface ContentPart {
   nickName?: string; // len pri zmienke: nickName bez '@'
 }
 
-// Rovnaké znaky ako pri registrácii nickName (RegisterPage.vue) - musia zostať zhodné,
-// inak by sa niektorí používatelia nedali zmieniť.
-const MENTION_PATTERN = /@[A-Za-z0-9_.-]*[A-Za-z0-9_]/g;
+// Povolené znaky nicku -  pismena, cisla, _ . - a nesmie koncit bodkov, ani pomlckou
+// aby sa pri "ahoj @jana." nebrala bodka na konci vety ako sucast nicku
+// jeden zdroj pre registraciu, aj zmienky, aby sa nemohli rozist
+const NICK_NAME = '[A-Za-z0-9_.-]*[A-Za-z0-9_]';
+
+// cely vstup je platny nick (RegisterPage)
+export const NICK_NAME_PATTERN = new RegExp(`^${NICK_NAME}$`);
+
+// @nick kdekolvek v texte spravy
+const MENTION_PATTERN = new RegExp(`@${NICK_NAME}`, 'g');
 
 // Rozdelí text na kúsky; spojením všetkých `text` vznikne pôvodný text.
 export function splitMentions(content: string): ContentPart[] {
