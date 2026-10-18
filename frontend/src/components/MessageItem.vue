@@ -1,10 +1,12 @@
-<!-- Jedna správa v zozname (UC 7).
-     Vlastník: Maksym (B2). -->
+<!-- Jedna správa v zozname (UC 7): avatar, meno, čas a text so zvýraznenými @zmienkami (UC 6).
+     Vlastník: Maksym (B2, B3). -->
 <template>
+  <!-- :class pridá triedu len keď platí podmienka: pokračovanie skupiny, moja správa, zmienka mňa. -->
   <li
     class="message"
     :class="{ 'message--compact': compact, 'message--own': isOwn, 'message--mention': mentionsMe }"
   >
+    <!-- Prvá správa skupiny má avatar; --hue je odtieň farby odvodený z id autora (pozri .user-avatar v app.scss). -->
     <q-avatar
       v-if="!compact"
       size="36px"
@@ -14,6 +16,7 @@
     >
       {{ authorInitials }}
     </q-avatar>
+
     <!-- V kompaktnej správe je miesto avatara prázdne, aby text lícoval so skupinou.
          Pri prejdení myšou sa tam ukáže čas. -->
     <time v-else class="message-gutter-time tabular" :datetime="message.createdAt">{{ time }}</time>
@@ -23,6 +26,9 @@
         <span class="message-author">{{ authorName }}</span>
         <time class="message-time tabular" :datetime="message.createdAt">{{ time }}</time>
       </div>
+
+      <!-- Text po kúskoch (splitMentions): zmienky ako <span>, zvyšok ako text.
+     Nie v-html – text píšu iní používatelia, {{ }} ho escapuje (ochrana pred XSS). -->
       <p class="message-text">
         <template v-for="(part, index) in contentParts" :key="index">
           <span
@@ -50,7 +56,9 @@ import { splitMentions, type ContentPart } from '../utils/mentions';
 export default defineComponent({
   name: 'MessageItem',
 
+  // Vstupy od rodiča (MessageList); komponent ich len číta, nemení.
   props: {
+    // PropType<Message> povie TypeScriptu presný typ objektu (type: Object je len kontrola Vue).
     message: {
       type: Object as PropType<Message>,
       required: true,
@@ -63,9 +71,12 @@ export default defineComponent({
     },
   },
 
+  // computed: Vue si výsledok pamätá a prepočíta ho, len keď sa zmení to, z čoho vznikol
+  // (napr. po prihlásení iného používateľa sa samy prepočítajú isOwn a mentionsMe).
   computed: {
     ...mapStores(useUsersStore, useMessagesStore),
 
+    // Autor správy; samostatne, aby sa v store hľadal raz (používajú ho authorName aj authorInitials).
     author(): User | undefined {
       return this.usersStore.userById(this.message.authorId);
     },
@@ -78,6 +89,7 @@ export default defineComponent({
       return this.author ? initials(this.author.firstName, this.author.lastName) : '?';
     },
 
+    // Čas správy po slovensky, napr. "09:41" (2-digit = vždy dve číslice).
     time(): string {
       return new Date(this.message.createdAt).toLocaleTimeString('sk-SK', {
         hour: '2-digit',
@@ -103,6 +115,7 @@ export default defineComponent({
   },
 
   methods: {
+    // Funkciu z utils treba pridať do methods, inak ju šablóna nevidí.
     avatarHue,
 
     // Je to zmienka prihláseného používateľa? (bez ohľadu na veľké/malé písmená)

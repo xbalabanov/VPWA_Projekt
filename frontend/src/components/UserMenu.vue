@@ -2,6 +2,8 @@
      Vlastník: Maksym (B5, B6). -->
 <template>
   <q-btn v-if="me" flat no-caps class="user-menu" aria-label="Stav a nastavenie notifikácií">
+    <!-- Avatar + bodka stavu v obale (q-avatar orezáva obsah, bodka by sa nezmestila).
+     Trieda bodky sa skladá zo stavu: status-dot--online / --dnd / --offline. -->
     <span class="user-menu-avatar">
       <q-avatar
         size="34px"
@@ -18,6 +20,7 @@
       <span class="user-menu-status">{{ statusLabel(me.status) }}</span>
     </span>
 
+    <!-- Menu sa otvorí po kliknutí na tlačidlo, NAD ním (anchor/self), lebo tlačidlo je dole. -->
     <q-menu anchor="top left" self="bottom left" :offset="[0, 8]">
       <q-list dense class="user-menu-list">
         <!-- Kto som: rovnaké údaje, aké vidia ostatní (nick používajú v @zmienkach). -->
@@ -64,6 +67,7 @@
         <q-separator />
 
         <q-item-label header>Notifikácie</q-item-label>
+        <!-- tag="label" = klik kamkoľvek na riadok prepne toggle; bez v-close-popup, menu ostane otvorené. -->
         <q-item tag="label">
           <q-item-section avatar>
             <q-icon name="alternate_email" size="18px" />
@@ -73,6 +77,8 @@
             <q-item-label caption>Len správy s @{{ me.nickName }}</q-item-label>
           </q-item-section>
           <q-item-section side>
+            <!-- :model-value + @update:model-value namiesto v-model: zmena ide cez akciu store,
+            nie priamym zápisom do cudzieho store (v-model je len skratka týchto dvoch). -->
             <q-toggle :model-value="me.notifyMentionsOnly" @update:model-value="setMentionsOnly" />
           </q-item-section>
         </q-item>
@@ -88,7 +94,8 @@ import { useUsersStore } from '../stores/users';
 import type { User, UserStatus } from '../types/models';
 import { avatarHue, initials } from '../utils/avatar';
 
-// Stavy podľa UC 9 a čo pre používateľa znamenajú.
+// Stavy podľa UC 9 a čo pre používateľa znamenajú. value = čo sa ukladá (UserStatus),
+// label = čo sa zobrazí, hint = vysvetlenie pod ním.
 const STATUS_OPTIONS: { value: UserStatus; label: string; hint: string }[] = [
   { value: 'online', label: 'Online', hint: 'Správy aj notifikácie' },
   { value: 'dnd', label: 'Nerušiť', hint: 'Bez notifikácií' },
@@ -98,12 +105,14 @@ const STATUS_OPTIONS: { value: UserStatus; label: string; hint: string }[] = [
 export default defineComponent({
   name: 'UserMenu',
 
+  // Konštantu zhora treba dať do data, inak ju šablóna (v-for) nevidí.
   data() {
     return {
       statusOptions: STATUS_OPTIONS,
     };
   },
 
+  // Prihlásený používateľ (skratka pre šablónu).
   computed: {
     ...mapStores(useUsersStore),
 
@@ -113,13 +122,16 @@ export default defineComponent({
   },
 
   methods: {
+    // Funkcie z utils treba pridať do methods, inak ich šablóna nevidí.
     avatarHue,
     initials,
 
+    // 'dnd' → 'Nerušiť' (text pod menom); ?? status = poistka, keby stav v zozname nebol.
     statusLabel(status: UserStatus): string {
       return STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status;
     },
 
+    // Volá ju toggle s novou hodnotou; zmena ide cez akciu users store.
     setMentionsOnly(value: boolean): void {
       this.usersStore.setNotifyMentionsOnly(value);
     },

@@ -1,6 +1,6 @@
 // src/stores/messages.ts
-// Spoločný základ: falošné správy a jednoduché vyhľadávanie. Akcie (odoslanie,
-// stránkovanie, @nickname, písanie) pribudnú v úlohách B2-B4 a B7.
+// Store pre správy (B7, UC 3, 6, 7, 8, 11): falošný server s históriou, stránkované
+// načítanie (infinite scroll), odoslanie správy, zmienky @nickname a rozpísané správy.
 import { defineStore } from 'pinia';
 import type { Mention, Message } from '../types/models';
 import { useUsersStore } from './users';
@@ -15,7 +15,7 @@ interface MessagesState {
   drafts: Draft[]; // kto práve čo píše (zatiaľ len ja, neskôr aj ostatní cez WebSocket)
 }
 
-// Rozpísaná (ešte neodoslaná) správa pre "X is typing" (UC 11).
+// Rozpísaná (ešte neodoslaná) správa pre "X píše…" (UC 11).
 // Nie je v models.ts, lebo sa neukladá do databázy – je to len dočasný stav.
 export interface Draft {
   channelId: number;
@@ -23,8 +23,7 @@ export interface Draft {
   text: string;
 }
 
-// --- Generovanie falošnej histórie (dosť správ aj na neskorší infinite scroll) ---
-
+// Vety, z ktorých sa skladajú falošné správy (opakujú sa dokola).
 const SAMPLE_TEXTS = [
   'Ahoj, ako sa máte?',
   'Zajtra máme cvičenie z VPWA.',
@@ -42,12 +41,15 @@ const SAMPLE_TEXTS = [
   'Dlhšia správa na testovanie zalamovania riadkov: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
 ];
 
+// Vráti prvok na pozícii index; ak je index väčší ako pole, začne znova od začiatku (modulo).
+// <T> = funguje pre pole akéhokoľvek typu. throw je kvôli TypeScriptu (items[i] môže byť undefined).
 function pick<T>(items: T[], index: number): T {
   const item = items[index % items.length];
   if (item === undefined) throw new Error('Prázdne pole');
   return item;
 }
 
+// Vytvorí `count` falošných správ kanála s id od `firstId`; autori sa striedajú z memberIds.
 function makeMessages(
   channelId: number,
   memberIds: number[],
@@ -133,6 +135,8 @@ function postMessage(channelId: number, authorId: number, content: string): Prom
   });
 }
 
+// Pinia store: state = dáta, getters = odvodené hodnoty, actions = zmeny dát.
+// https://pinia.vuejs.org/core-concepts/
 export const useMessagesStore = defineStore('messages', {
   state: (): MessagesState => ({
     messages: [], // len správy, ktoré si klient už stiahol zo "servera"
@@ -142,6 +146,7 @@ export const useMessagesStore = defineStore('messages', {
     drafts: [],
   }),
 
+  // Getter s parametrom je funkcia, ktorá vracia funkciu: (state) => (id) => výsledok.
   getters: {
     // Všetky správy kanála, od najstaršej po najnovšiu.
     messagesByChannel:
@@ -180,7 +185,7 @@ export const useMessagesStore = defineStore('messages', {
       try {
         // Kurzor = id najstaršej správy, ktorú už máme (alebo null).
         const loaded = this.messagesByChannel(channelId);
-        const beforeId = loaded[0]?.id ?? null;
+        const beforeId = loaded[0]?.id ?? null; // ?. = nespadni ak neexistuje, ?? = inak null
 
         const page = await fetchMessages(channelId, beforeId, PAGE_SIZE);
 
@@ -191,6 +196,7 @@ export const useMessagesStore = defineStore('messages', {
         // Menej ako plná stránka = došli sme na začiatok histórie.
         this.hasMore[channelId] = page.length === PAGE_SIZE;
       } finally {
+        // finally sa vykoná vždy (aj pri chybe), aby loading nezostal navždy true.
         this.loading[channelId] = false;
       }
     },
@@ -207,6 +213,7 @@ export const useMessagesStore = defineStore('messages', {
       const message = await postMessage(channelId, authorId, text);
       this.messages.push(message); // nová správa ide na koniec (je najnovšia)
       this.rememberMentions([message]);
+      // Až po rememberMentions – notifikácia sa pýta isMentioned.
       this.notifyAboutMessage(message);
       return null;
     },

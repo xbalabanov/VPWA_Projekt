@@ -1,9 +1,12 @@
-<!-- Príkazový riadok: odoslanie správy alebo príkazu (UC 3).
+<!-- Príkazový riadok (UC 3): odoslanie správy alebo príkazu, chyby, nápoveda syntaxe,
+     dopĺňanie príkazov a nickov a rozpísaný text pre "X píše…" (UC 11).
      Vlastník: Maksym (B1).
-     Príkazy rozpozná utils/commandParser.ts. -->
+     Príkazy rozpozná utils/commandParser.ts, vykoná utils/commandHandlers.ts (Stanislav). -->
 <template>
   <div class="command-line">
     <TypingIndicator />
+    <!-- Návrhy (dopĺňanie). mousedown.prevent namiesto click: klik by políčku zobral fokus
+     a kurzor by z neho zmizol. role/aria-selected = prístupnosť pre čítačky obrazovky. -->
     <ul v-if="suggestions.length" class="command-suggestions" role="listbox" aria-label="Návrhy">
       <li
         v-for="(suggestion, index) in suggestions"
@@ -18,6 +21,9 @@
         <code>{{ suggestion.label }}</code>
       </li>
     </ul>
+
+    <!-- Nad políčkom chyba (po Enteri) alebo šedá nápoveda syntaxe (počas písania); chyba má prednosť.
+     Rôzne key = Vue ich berie ako dva elementy, inak by sa animácia nespustila. -->
     <Transition name="command-note" mode="out-in">
       <div v-if="error" key="error" class="command-note command-note--error" role="alert">
         <q-icon name="error_outline" size="18px" />
@@ -28,8 +34,10 @@
         <code>{{ hint }}</code>
       </div>
     </Transition>
+
     <!-- Box príkazového riadka: pole + lišta s nápovedou klávesov a tlačidlom odoslať. -->
     <div class="composer-box" :class="{ 'composer-box--error': error !== null }">
+      <!-- v-model = obojsmerné prepojenie s this.text; každý kláves ide cez onKeydown (šípky, Tab, Enter). -->
       <q-input
         v-model="text"
         class="command-input"
@@ -38,6 +46,7 @@
         aria-label="Správa alebo príkaz"
         @keydown="onKeydown"
       />
+
       <div class="composer-toolbar">
         <span class="composer-hint"><kbd>/</kbd> príkazy</span>
         <span class="composer-hint"><kbd>@</kbd> zmienka</span>
@@ -69,19 +78,23 @@ import { COMMAND_NAMES, commandUsage, parseInput, type CommandName } from '../ut
 import { executeCommand } from '../utils/commandHandlers';
 import TypingIndicator from './TypingIndicator.vue';
 
-// Jeden návrh v zozname nad políčkom.
+// Jeden návrh v zozname nad políčkom. Je všeobecný (príkaz aj nick): hovorí len, čo ukázať
+// a aký bude celý text políčka po výbere, takže výber funguje rovnako pre všetky druhy.
 interface Suggestion {
   key: string; // unikátny kľúč pre v-for
   label: string; // čo sa zobrazí v zozname
   text: string; // celý nový obsah políčka po výbere
 }
 
+// Najviac 8 návrhov, aby zoznam nezakryl obrazovku.
 const MAX_SUGGESTIONS = 8;
 
 export default defineComponent({
   name: 'CommandLine',
   components: { TypingIndicator },
 
+  // Vlastný stav komponentu. "as string | null" – bez toho by TypeScript z null usúdil,
+  // že error je vždy null a nedovolil by doň dať text.
   data() {
     return {
       text: '',
@@ -102,13 +115,14 @@ export default defineComponent({
         : 'Napíš /join nazovKanala';
     },
 
-    // Syntax príkazu, ktorý práve píšeš, napr. "/invite nickName". null = nič nepíšeš.
+    // parsed.command je len pri známom príkaze, takže pri "/inv" (nedopísané) nápoveda nie je.
     hint(): string | null {
       const parsed = parseInput(this.text);
       return parsed.command ? commandUsage(parsed.command) : null;
     },
 
     // Návrhy podľa toho, čo práve píšeš; prvý typ, ktorý sedí, vyhráva. [] = zoznam skrytý.
+    // Metóda vráti null = "netýka sa ma" (?? skúsi ďalšiu), [] = "týka, ale nič neponúkam" (zastaví sa).
     suggestions(): Suggestion[] {
       const list =
         this.commandNameSuggestions() ??
@@ -120,7 +134,7 @@ export default defineComponent({
   },
 
   watch: {
-    // Keď používateľ začne písať, stará chyba už neplatí.
+    // Pri každom písmene: stará chyba už neplatí, výber návrhov od začiatku a rozpísaný text do store (UC 11).
     text() {
       this.error = null;
       this.activeSuggestion = 0; // nový text = nový zoznam, výber od začiatku
@@ -135,7 +149,8 @@ export default defineComponent({
   },
 
   methods: {
-    // "/" + začiatok názvu príkazu, napr. "/in".
+    // "/" + začiatok názvu príkazu, napr. "/in" (regex: lomka a zatiaľ žiadna medzera).
+    // Celý dopísaný príkaz vráti [] → zoznam zmizne a Enter ho odošle.
     commandNameSuggestions(): Suggestion[] | null {
       const match = /^\/(\S*)$/.exec(this.text);
       if (!match) return null;
@@ -151,6 +166,7 @@ export default defineComponent({
     },
 
     // Argument príkazu s nickName: "/invite ja", "/kick ", "/revoke pe".
+    // Regex: príkaz (zátvorka 1), medzera, rozpísaný nick (zátvorka 2); "i" = bez ohľadu na veľkosť písmen.
     commandArgSuggestions(): Suggestion[] | null {
       const match = /^\/(invite|revoke|kick)\s+(\S*)$/i.exec(this.text);
       const channelId = this.channelsStore.activeChannelId;
@@ -169,7 +185,8 @@ export default defineComponent({
       return this.nickSuggestions(candidates, match[2] ?? '', (nick) => `/${command} ${nick}`);
     },
 
-    // Zmienka na konci textu: "ahoj @ja".
+    // Zmienka na konci textu: "ahoj @ja". (^|\s) = pred @ je začiatok alebo medzera (nie e-mail).
+    // before = text pred "@" (-1 je za samotný "@"), ten sa pri výbere zachová.
     mentionSuggestions(): Suggestion[] | null {
       const match = /(^|\s)@([A-Za-z0-9_.-]*)$/.exec(this.text);
       const channelId = this.channelsStore.activeChannelId;
@@ -184,6 +201,8 @@ export default defineComponent({
     },
 
     // Používatelia z `userIds`, ktorých nick začína `typed`, ako návrhy (podľa abecedy).
+    // toText = funkcia, ktorá z nicku spraví celý text políčka (každý volajúci iný, napr. "/kick jana").
+    // "nick is string" = type guard: po filtri sú v poli už len stringy, nie undefined.
     nickSuggestions(
       userIds: number[],
       typed: string,
@@ -206,11 +225,12 @@ export default defineComponent({
       if (event.isComposing) return; // písanie diakritiky cez IME, Enter ešte nie je "odoslať"
 
       const count = this.suggestions.length;
+      // Otvorený zoznam návrhov: šípky menia výber, Tab/Enter vyberie. Inak Enter odošle.
       if (count > 0) {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
           event.preventDefault(); // inak by šípka posunula kurzor v texte
           const step = event.key === 'ArrowDown' ? 1 : -1;
-          this.activeSuggestion = (this.activeSuggestion + step + count) % count;
+          this.activeSuggestion = (this.activeSuggestion + step + count) % count; // obieha dokola; +count = nie záporné
           return;
         }
         if (event.key === 'Tab' || event.key === 'Enter') {
@@ -232,6 +252,8 @@ export default defineComponent({
       if (suggestion) this.text = suggestion.text;
     },
 
+    // Enter / tlačidlo Odoslať: parser rozhodne správa vs. príkaz. Chyba sa zobrazí a text zostane
+    // (dá sa opraviť); pri úspechu sa políčko vyčistí.
     async submit(): Promise<void> {
       if (this.sending) return; // poistka proti dvojitému Enteru
 
@@ -243,6 +265,7 @@ export default defineComponent({
         return;
       }
 
+      // Príkaz vykoná commandHandlers.ts (Stanislav); vráti null alebo text chyby.
       if (parsed.kind === 'command') {
         const error = executeCommand(parsed);
         if (error) this.error = error;
@@ -256,6 +279,7 @@ export default defineComponent({
         return;
       }
 
+      // Obyčajná správa; parsed.text je už bez medzier na okrajoch (trim v parseri).
       this.sending = true;
       try {
         const error = await this.messagesStore.sendMessage(channelId, parsed.text);
@@ -266,7 +290,8 @@ export default defineComponent({
       }
     },
 
-    // UC 11: rozpísaná správa je viditeľná ako "X is typing". Príkazy nie, tie sú len moje.
+    // UC 11: rozpísaná správa je viditeľná ako "X píše…". Príkazy nie (pošle sa prázdny text),
+    // tie sú len moje. Po odoslaní je text prázdny, takže "píše…" samo zmizne.
     updateDraft(): void {
       const channelId = this.channelsStore.activeChannelId;
       if (channelId === null) return;
