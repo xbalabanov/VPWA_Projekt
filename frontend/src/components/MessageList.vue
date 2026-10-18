@@ -1,8 +1,10 @@
-<!-- Správy aktívneho kanála, najnovšie dole (UC 7).
-     Vlastník: Maksym (B2).
-     Má vlastný posuvník (nie celé okno), aby sa naň dal neskôr napojiť infinite scroll. -->
+<!-- Správy aktívneho kanála, najnovšie dole (UC 7): prvé načítanie, infinite scroll,
+     zoskupovanie správ, oddeľovače dní a scroll dole pri novej správe.
+     Vlastník: Maksym (B2, B1).
+     Má vlastný posuvník (nie celé okno), aby sa dalo sledovať, kedy je používateľ pri vrchu. -->
 <template>
   <div ref="scroller" class="chat-scroll" @scroll="onScroll">
+    <!-- Vue zobrazí prvú platnú vetvu: žiadny kanál → načítava sa → prázdny kanál → zoznam. -->
     <div v-if="!channelsStore.activeChannel" class="empty-state">
       <q-icon name="forum" size="40px" />
       <div class="empty-title">Nie je vybraný žiadny kanál</div>
@@ -35,6 +37,8 @@
           >.
         </p>
       </li>
+      <!-- Pre každú správu: voliteľný oddeľovač dňa + samotná správa.
+     :key = id (nie index), lebo pri dočítaní starších správ sa indexy posunú. -->
       <template v-for="(message, index) in channelMessages" :key="message.id">
         <li v-if="startsNewDay(index)" class="day-divider">
           <span>{{ dayLabel(message.createdAt) }}</span>
@@ -62,7 +66,7 @@ function isSameDay(a: Date, b: Date): boolean {
   return a.toDateString() === b.toDateString();
 }
 
-// Text oddeľovača dní: "Today", "Yesterday" alebo napr. "Thursday, 1 October".
+// Text oddeľovača dní: "Dnes", "Včera" alebo napr. "piatok 2. októbra".
 function dayLabel(createdAt: string): string {
   const date = new Date(createdAt);
   const today = new Date();
@@ -87,11 +91,13 @@ export default defineComponent({
       return channelId === null ? [] : this.messagesStore.messagesByChannel(channelId);
     },
 
+    // Načítava sa práve tento kanál? (=== true, lebo nenačítaný kanál má undefined)
     isLoading(): boolean {
       const channelId = this.channelsStore.activeChannelId;
       return channelId !== null && this.messagesStore.loading[channelId] === true;
     },
 
+    // Nick správcu kanála do úvodu na začiatku histórie.
     adminNick(): string {
       const adminId = this.channelsStore.activeChannel?.adminId;
       return adminId === undefined ? '' : (this.usersStore.userById(adminId)?.nickName ?? '');
@@ -109,11 +115,14 @@ export default defineComponent({
   },
 
   watch: {
+    // Prepnutie kanála → načítaj ho (void = na Promise zámerne nečakáme).
     'channelsStore.activeChannelId'() {
       void this.openChannel();
     },
 
-    // Pribudla správa dole (odoslaná alebo prijatá).
+    // Pribudla správa dole (odoslaná alebo prijatá). Sledujeme id poslednej správy, nie počet –
+    // infinite scroll pridáva správy hore a nesmie ma hodiť dole. Moja správa → scroll vždy,
+    // cudzia → len ak už som dole (nechcem stratiť miesto v histórii).
     lastMessageId(newId: number | null, oldId: number | null) {
       if (newId === null || oldId === null || newId === oldId) return;
 
@@ -123,6 +132,7 @@ export default defineComponent({
     },
   },
 
+  // Pri prvom zobrazení (watch reaguje až na zmenu kanála, nie na prvý kanál).
   mounted() {
     void this.openChannel();
   },
@@ -152,6 +162,8 @@ export default defineComponent({
       if (channelId === null) return;
 
       const scroller = this.$refs.scroller as HTMLElement;
+      // Prehliadač drží posun od vrchu; keď pribudnú správy hore, posunieme scroll presne
+      // o pribudnutú výšku, inak by používateľ "skočil" o stránku dozadu.
       const heightBefore = scroller.scrollHeight;
 
       await this.messagesStore.loadOlder(channelId);
@@ -160,6 +172,7 @@ export default defineComponent({
       scroller.scrollTop += scroller.scrollHeight - heightBefore;
     },
 
+    // Úplne dole (najnovšie správy); až po vykreslení ($nextTick).
     scrollToBottom(): void {
       // Čakáme, kým Vue vykreslí správy nového kanála.
       void this.$nextTick(() => {
@@ -169,7 +182,8 @@ export default defineComponent({
     },
 
     // Pokračuje správa na pozícii `index` skupinu predošlej správy?
-    // (rovnaký autor a menej ako 5 minút od seba)
+    // (rovnaký autor, menej ako 5 minút a nie cez polnoc). Rieši to zoznam, nie MessageItem,
+    // lebo len zoznam vidí susednú správu.
     isContinuation(index: number): boolean {
       const current = this.channelMessages[index];
       const previous = this.channelMessages[index - 1];
@@ -181,6 +195,7 @@ export default defineComponent({
       );
     },
 
+    // Funkciu zhora treba pridať do methods, inak ju šablóna nevidí.
     dayLabel,
 
     // Začína správa na pozícii `index` nový deň? (prvá načítaná správa vždy áno)
@@ -192,7 +207,8 @@ export default defineComponent({
       return !isSameDay(new Date(current.createdAt), new Date(previous.createdAt));
     },
 
-    // Je používateľ (skoro) úplne dole? Tolerancia 150 px.
+    // Je používateľ (skoro) úplne dole? Zvyšok pod oknom = scrollHeight - scrollTop - clientHeight,
+    // tolerancia 150 px (na presnú nulu sa pri scrollovaní netrafíš).
     isNearBottom(): boolean {
       const scroller = this.$refs.scroller as HTMLElement | undefined;
       if (!scroller) return true;

@@ -1,1 +1,9 @@
+# Úplné zadanie z repozitára predmetu (len lokálne, necommituje sa)
 complete_task.md
+
+# Systémové súbory macOS a Windows
+.DS_Store
+Thumbs.db
+
+# Lokálne nastavenia Claude Code (napr. launch.json pre náhľad v prehliadači)
+.claude/

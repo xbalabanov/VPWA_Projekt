@@ -22,14 +22,23 @@ export function splitMentions(content: string): ContentPart[] {
     const mention = match[0]; // napr. "@jana"
 
     // Obyčajný text medzi predošlou zmienkou a touto.
-    if (start > lastEnd) parts.push({ text: content.slice(lastEnd, start) });
+    if (start > lastEnd)
+      parts.push({
+        text: content.slice(lastEnd, start),
+      });
 
-    parts.push({ text: mention, nickName: mention.slice(1) });
+    parts.push({
+      text: mention,
+      nickName: mention.slice(1),
+    });
     lastEnd = start + mention.length;
   }
 
   // Zvyšok textu za poslednou zmienkou.
-  if (lastEnd < content.length) parts.push({ text: content.slice(lastEnd) });
+  if (lastEnd < content.length)
+    parts.push({
+      text: content.slice(lastEnd),
+    });
 
   return parts;
 }

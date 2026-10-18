@@ -1,10 +1,15 @@
-<!-- "X is typing" nad príkazovým riadkom (UC 11). Klik na meno ukáže rozpísaný text naživo.
+<!-- "X píše…" nad príkazovým riadkom (UC 11). Klik na meno ukáže rozpísaný text naživo.
+     Dáta číta zo store (drafts); teraz ich tam posiela CommandLine, v 2. fáze WebSocket.
      Vlastník: Maksym (B4). -->
 <template>
   <div class="typing">
+    <!-- Riadok je tu vždy (pevná výška v CSS), aby príkazový riadok neposkakoval.
+     aria-live="polite" = čítačka oznámi zmenu, ale nepreruší, čo práve číta. -->
     <div class="typing-line" aria-live="polite">
       <template v-if="drafts.length">
         <span class="typing-dots" aria-hidden="true"><span /><span /><span /></span>
+        <!-- Meno ako <button>: dá sa ovládať klávesnicou; aria-expanded = či je náhľad otvorený.
+        Čiarka za každým menom okrem posledného. -->
         <template v-for="(draft, index) in drafts" :key="draft.userId">
           <button
             type="button"
@@ -20,6 +25,8 @@
       </template>
     </div>
 
+    <!-- Náhľad sa mení naživo sám (openDraft je computed nad store). Nie dialóg – ten by
+     zobral fokus z políčka a nedalo by sa ďalej písať. -->
     <div v-if="openDraft" class="typing-preview">
       <div class="typing-preview-label">{{ nickName(openDraft.userId) }} práve píše:</div>
       <p class="typing-preview-text">
@@ -41,13 +48,14 @@ export default defineComponent({
 
   data() {
     return {
-      openUserId: null as number | null, // koho rozpísaný text práve ukazujeme
+      openUserId: null as number | null, // koho náhľad je otvorený (id, nie text – ten sa mení)
     };
   },
 
   computed: {
     ...mapStores(useChannelsStore, useMessagesStore, useUsersStore),
 
+    // Kto práve píše v aktívnom kanáli.
     drafts(): Draft[] {
       const channelId = this.channelsStore.activeChannelId;
       return channelId === null ? [] : this.messagesStore.draftsIn(channelId);
@@ -64,6 +72,7 @@ export default defineComponent({
       return this.usersStore.userById(userId)?.nickName ?? 'Niekto';
     },
 
+    // Klik na otvorené meno náhľad zavrie, na iné meno ho prepne na toho človeka.
     toggle(userId: number): void {
       this.openUserId = this.openUserId === userId ? null : userId;
     },
