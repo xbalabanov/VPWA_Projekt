@@ -4,6 +4,7 @@
     <p class="auth-subtitle">Zvoľ si nick, cez ktorý ťa ostatní oslovia (@nick).</p>
 
     <!-- @submit sa zavolá iba ak prejdú všetky :rules -->
+    <!-- lazy-rules: chyby sa ukazu az po opusteni pola, nie po kazdom characteri -> menej requestov. Zdroj: https://v2.quasar.dev/vue-components/input#internal-validation -->
     <q-form @submit="onSubmit" class="q-gutter-xs">
       <!-- meno a priezvisko vedla seba, aby sa formular zmestil bez scrollovania -->
       <div class="name-row">
@@ -11,6 +12,7 @@
           v-model="firstName"
           label="Meno"
           outlined
+          lazy-rules
           dense
           :rules="[(val) => !!val.trim() || 'Zadaj meno']"
         />
@@ -19,6 +21,7 @@
           v-model="lastName"
           label="Priezvisko"
           outlined
+          lazy-rules
           dense
           :rules="[(val) => !!val.trim() || 'Zadaj priezvisko']"
         />
@@ -28,6 +31,7 @@
         v-model="nickName"
         label="Nick"
         outlined
+        lazy-rules
         dense
         :rules="[
           (val) => !!val || 'Zadaj nick',
@@ -42,6 +46,7 @@
         label="Email"
         type="email"
         outlined
+        lazy-rules
         dense
         :rules="[
           (val) => !!val || 'Zadaj email',
@@ -55,6 +60,7 @@
         label="Heslo"
         type="password"
         outlined
+        lazy-rules
         dense
         :rules="[(val) => val.length >= 6 || 'Aspoň 6 znakov']"
       />
@@ -64,6 +70,7 @@
         label="Heslo znova"
         type="password"
         outlined
+        lazy-rules
         dense
         :rules="[(val) => val === password || 'Heslá sa nezhodujú']"
       />

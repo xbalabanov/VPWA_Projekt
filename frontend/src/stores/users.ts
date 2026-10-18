@@ -79,7 +79,7 @@ export const useUsersStore = defineStore('users', {
         state.users.find((u) => u.id === id),
 
     // Unikátnosť bez ohľadu na veľké/malé písmená (Jana = jana).
-    // RegisterPage ich volá v :rules, aby chyba bola vidno hneď pri písaní.
+    // RegisterPage ich volá v :rules, lazy-rules -> chyba je vidno az po opusteni pola
     isEmailTaken:
       (state) =>
       (email: string): boolean =>
