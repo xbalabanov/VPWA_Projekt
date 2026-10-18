@@ -1,25 +1,20 @@
-// Quasar Sass (& SCSS) Variables
+// Quasar Sass premenné
 // --------------------------------------------------
-// To customize the look and feel of this app, you can override
-// the Sass/SCSS variables found in Quasar's source Sass/SCSS files.
+// Quasar z nich generuje triedy ako .bg-primary alebo .text-negative. Vzhľad aplikácie
+// však určujú CSS tokeny v app.scss (--accent, --danger, ...), ktoré tieto farby
+// za behu prepisujú (--q-primary, --q-negative) a menia sa aj s tmavou témou.
+// Hodnoty tu sú preto len záloha: tie isté farby ako svetlá téma v app.scss,
+// prevedené z OKLCH do hex (najbezpečnejší formát pre Sass premenné Quasaru).
+// https://v2.quasar.dev/style/sass-scss-variables
 
-// Check documentation for full list of Quasar variables
+$primary: #1f744f; // --accent  oklch(0.5 0.1 160)
+$secondary: #1666aa; // --invite  oklch(0.5 0.13 250)
+$accent: #1f744f; // Quasar "accent" = náš akcent
 
-// Your own variables (that are declared here) and Quasar's own
-// ones will be available out of the box in your .vue/.scss/.sass files
+$dark: #0c110e; // --sidebar v tmavom režime
+$dark-page: #131715; // --bg v tmavom režime
 
-// It's highly recommended to change the default colors
-// to match your app's branding.
-// Tip: Use the "Theme Builder" on Quasar's documentation website.
-
-$primary: #1976d2;
-$secondary: #26a69a;
-$accent: #9c27b0;
-
-$dark: #1d1d1d;
-$dark-page: #121212;
-
-$positive: #21ba45;
-$negative: #c10015;
-$info: #31ccec;
-$warning: #f2c037;
+$positive: #2c965d; // --online
+$negative: #ba2b28; // --danger
+$info: #1666aa;
+$warning: #784900; // --mention-text
