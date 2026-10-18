@@ -5,7 +5,7 @@
   <div ref="scroller" class="chat-scroll" @scroll="onScroll">
     <div v-if="!channelsStore.activeChannel" class="empty-state">
       <q-icon name="forum" size="40px" />
-      <div class="empty-title">No channel selected</div>
+      <div class="empty-title">Nie je vybraný žiadny kanál</div>
     </div>
 
     <div v-else-if="isLoading && !channelMessages.length" class="empty-state">
@@ -14,15 +14,26 @@
 
     <div v-else-if="!channelMessages.length" class="empty-state">
       <q-icon :name="channelsStore.activeChannel.isPrivate ? 'lock' : 'tag'" size="40px" />
-      <div class="empty-title">No messages yet</div>
+      <div class="empty-title">Zatiaľ žiadne správy</div>
     </div>
 
-    <ol v-else class="message-list" aria-label="Messages">
+    <ol v-else class="message-list" aria-label="Správy">
       <li v-if="isLoading" class="history-status">
         <q-spinner size="24px" />
       </li>
-      <li v-else-if="!hasMore" class="history-status">
-        This is the start of #{{ channelsStore.activeChannel.name }}
+      <!-- Začiatok histórie: úvod kanála, ako keď otvoríš nový kanál v Slacku. -->
+      <li v-else-if="!hasMore" class="channel-intro">
+        <div class="channel-intro-icon">
+          <q-icon :name="channelsStore.activeChannel.isPrivate ? 'lock' : 'tag'" size="22px" />
+        </div>
+        <h2 class="channel-intro-title">{{ channelsStore.activeChannel.name }}</h2>
+        <p class="channel-intro-text">
+          Toto je úplný začiatok
+          {{ channelsStore.activeChannel.isPrivate ? 'súkromného' : 'verejného' }} kanála
+          <strong>#{{ channelsStore.activeChannel.name }}</strong
+          >. Vytvoril ho <strong>{{ adminNick }}</strong
+          >.
+        </p>
       </li>
       <template v-for="(message, index) in channelMessages" :key="message.id">
         <li v-if="startsNewDay(index)" class="day-divider">
@@ -58,9 +69,9 @@ function dayLabel(createdAt: string): string {
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
 
-  if (isSameDay(date, today)) return 'Today';
-  if (isSameDay(date, yesterday)) return 'Yesterday';
-  return date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+  if (isSameDay(date, today)) return 'Dnes';
+  if (isSameDay(date, yesterday)) return 'Včera';
+  return date.toLocaleDateString('sk-SK', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 export default defineComponent({
@@ -79,6 +90,11 @@ export default defineComponent({
     isLoading(): boolean {
       const channelId = this.channelsStore.activeChannelId;
       return channelId !== null && this.messagesStore.loading[channelId] === true;
+    },
+
+    adminNick(): string {
+      const adminId = this.channelsStore.activeChannel?.adminId;
+      return adminId === undefined ? '' : (this.usersStore.userById(adminId)?.nickName ?? '');
     },
 
     hasMore(): boolean {
@@ -197,10 +213,9 @@ export default defineComponent({
 
 .message-list {
   width: 100%;
-  max-width: 880px;
   /* margin-top: auto odsunie pri málo správach zoznam dole k príkazovému riadku. */
-  margin: auto auto 0;
-  padding: 20px 20px 12px;
+  margin: auto 0 0;
+  padding: 24px 16px 8px;
   list-style: none;
 }
 
@@ -209,7 +224,6 @@ export default defineComponent({
   justify-content: center;
   padding: 12px 0 4px;
   color: var(--text-subtle);
-  font-size: 0.8125rem;
 }
 
 .empty-state {
@@ -230,13 +244,13 @@ export default defineComponent({
   font-weight: 650;
 }
 
-/* Oddeľovač dní: text v strede, čiara naľavo aj napravo. */
+/* Oddeľovač dní: štítok v strede, čiara naľavo aj napravo. */
 .day-divider {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 20px 0 4px;
-  color: var(--text-subtle);
+  margin: 24px 8px 6px;
+  color: var(--text-muted);
   font-size: 0.75rem;
   font-weight: 600;
 }
@@ -245,6 +259,44 @@ export default defineComponent({
   content: '';
   flex: 1;
   border-top: 1px solid var(--border);
+}
+.day-divider span {
+  padding: 2px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+/* Úvod kanála na začiatku histórie. */
+.channel-intro {
+  padding: 8px 8px 16px;
+}
+.channel-intro-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.channel-intro-title {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+.channel-intro-text {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.channel-intro-text strong {
+  color: var(--text);
+  font-weight: 600;
 }
 
 @media (max-width: 599px) {

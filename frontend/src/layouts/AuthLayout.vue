@@ -72,7 +72,10 @@ export default defineComponent({
   color: var(--text-muted);
 }
 .auth-panel :deep(.auth-submit) {
-  width: 100%;
+  /* Formulár má q-gutter (okraj vľavo pri každom prvku), so 100 % by tlačidlo
+     pretieklo doprava. "stretch" vyplní presne zvyšné miesto. */
+  width: -webkit-fill-available;
+  width: stretch;
   min-height: 42px;
   border-radius: 9px;
   background: var(--accent);

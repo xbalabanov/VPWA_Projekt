@@ -1,7 +1,7 @@
 <template>
   <section>
-    <h1 class="auth-title">Create an account</h1>
-    <p class="auth-subtitle">Pick a nickname others will use to reach you.</p>
+    <h1 class="auth-title">Vytvoriť účet</h1>
+    <p class="auth-subtitle">Zvoľ si nick, cez ktorý ťa ostatní oslovia (@nick).</p>
 
     <!-- @submit sa zavolá iba ak prejdú všetky :rules -->
     <q-form @submit="onSubmit" class="q-gutter-xs">
@@ -26,14 +26,14 @@
 
       <q-input
         v-model="nickName"
-        label="NickName"
+        label="Nick"
         outlined
         dense
         :rules="[
-          (val) => !!val || 'Zadaj nickName',
+          (val) => !!val || 'Zadaj nick',
           // bez medzier a @, aby neskôr fungovalo @nickname aj /invite nickName
           (val) => /^[A-Za-z0-9_.-]+$/.test(val) || 'Iba písmená, čísla, _ . -',
-          (val) => !usersStore.isNickNameTaken(val) || 'NickName je už obsadený',
+          (val) => !usersStore.isNickNameTaken(val) || 'Tento nick je už obsadený',
         ]"
       />
 
@@ -45,7 +45,7 @@
         dense
         :rules="[
           (val) => !!val || 'Zadaj email',
-          (val) => val.includes('@') || 'Email musi obsahovat @',
+          (val) => val.includes('@') || 'Email musí obsahovať @',
           (val) => !usersStore.isEmailTaken(val) || 'Email je už použitý',
         ]"
       />
@@ -68,12 +68,10 @@
         :rules="[(val) => val === password || 'Heslá sa nezhodujú']"
       />
 
-      <q-btn unelevated no-caps class="auth-submit" label="Create account" type="submit" />
+      <q-btn unelevated no-caps class="auth-submit" label="Vytvoriť účet" type="submit" />
     </q-form>
 
-    <p class="auth-switch">
-      Already have an account? <router-link to="/login">Log in</router-link>
-    </p>
+    <p class="auth-switch">Už máš účet? <router-link to="/login">Prihlás sa</router-link></p>
   </section>
 </template>
 

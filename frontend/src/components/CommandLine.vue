@@ -4,12 +4,7 @@
 <template>
   <div class="command-line">
     <TypingIndicator />
-    <ul
-      v-if="suggestions.length"
-      class="command-suggestions"
-      role="listbox"
-      aria-label="Suggestions"
-    >
+    <ul v-if="suggestions.length" class="command-suggestions" role="listbox" aria-label="Návrhy">
       <li
         v-for="(suggestion, index) in suggestions"
         :key="suggestion.key"
@@ -33,28 +28,34 @@
         <code>{{ hint }}</code>
       </div>
     </Transition>
-    <q-input
-      v-model="text"
-      class="command-input"
-      :class="{ 'command-input--error': error !== null }"
-      borderless
-      placeholder="Write a message or /command"
-      aria-label="Message or command"
-      @keydown="onKeydown"
-    >
-      <template #append>
+    <!-- Box príkazového riadka: pole + lišta s nápovedou klávesov a tlačidlom odoslať. -->
+    <div class="composer-box" :class="{ 'composer-box--error': error !== null }">
+      <q-input
+        v-model="text"
+        class="command-input"
+        borderless
+        :placeholder="placeholder"
+        aria-label="Správa alebo príkaz"
+        @keydown="onKeydown"
+      />
+      <div class="composer-toolbar">
+        <span class="composer-hint"><kbd>/</kbd> príkazy</span>
+        <span class="composer-hint"><kbd>@</kbd> zmienka</span>
+        <span class="composer-hint"><kbd>Tab</kbd> doplniť</span>
+        <q-space />
+        <span class="composer-hint composer-hint--send"><kbd>Enter</kbd> odoslať</span>
         <q-btn
-          round
-          flat
+          unelevated
           dense
-          icon="send"
+          icon="arrow_upward"
           class="command-send"
-          aria-label="Send"
+          :class="{ 'command-send--ready': text.trim() !== '' }"
+          aria-label="Odoslať"
           :loading="sending"
           @click="submit"
         />
-      </template>
-    </q-input>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -92,6 +93,14 @@ export default defineComponent({
 
   computed: {
     ...mapStores(useChannelsStore, useMessagesStore, useUsersStore),
+
+    // Placeholder pomenuje kanál, kam správa pôjde.
+    placeholder(): string {
+      const channel = this.channelsStore.activeChannel;
+      return channel
+        ? `Správa do #${channel.name}, alebo / pre príkazy`
+        : 'Napíš /join nazovKanala';
+    },
 
     // Syntax príkazu, ktorý práve píšeš, napr. "/invite nickName". null = nič nepíšeš.
     hint(): string | null {
@@ -243,7 +252,7 @@ export default defineComponent({
 
       const channelId = this.channelsStore.activeChannelId;
       if (channelId === null) {
-        this.error = 'Select a channel first';
+        this.error = 'Najprv vyber kanál';
         return;
       }
 
@@ -271,33 +280,70 @@ export default defineComponent({
 
 <style scoped>
 .command-line {
-  padding: 10px 16px;
-}
-.command-input {
-  padding: 0 6px 0 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  transition: border-color 150ms cubic-bezier(0.25, 1, 0.5, 1);
-}
-.command-input:focus-within {
-  border-color: var(--accent);
+  padding: 4px 16px 14px;
 }
 
-/* Chyba: červený rámik, aj keď je políčko vo fokuse. */
-.command-input--error,
-.command-input--error:focus-within {
+/* Box: plocha s rámikom (bez tieňa); pri písaní rámik v akcente + jemný prstenec. */
+.composer-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition:
+    border-color 150ms cubic-bezier(0.25, 1, 0.5, 1),
+    box-shadow 150ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+.composer-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 15%, transparent);
+}
+/* Chyba: červený rámik, aj keď je políčko vo fokuse (pravidlo je až za :focus-within). */
+.composer-box--error,
+.composer-box--error:focus-within {
   border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--danger) 15%, transparent);
+}
+
+.command-input {
+  padding: 4px 14px 0;
 }
 .command-input :deep(.q-field__native) {
   color: var(--text);
+  font-size: 0.9375rem;
 }
 .command-input :deep(.q-field__native::placeholder) {
   color: var(--text-subtle);
   opacity: 1;
 }
+
+/* Spodná lišta: nápoveda klávesov vľavo, odoslanie vpravo. */
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 2px 8px 8px 14px;
+}
+.composer-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-subtle);
+  font-size: 0.71875rem;
+  white-space: nowrap;
+}
 .command-send {
-  color: var(--accent);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+  color: var(--text-subtle);
+  transition:
+    background-color 150ms cubic-bezier(0.25, 1, 0.5, 1),
+    color 150ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+/* Keď je čo poslať, tlačidlo dostane akcent. */
+.command-send--ready {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 /* Hláška nad políčkom: chyba (červená) alebo nápoveda syntaxe príkazu (šedá). */
@@ -330,8 +376,9 @@ export default defineComponent({
   padding: 4px;
   list-style: none;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--shadow-md);
 }
 .command-suggestion {
   padding: 6px 10px;

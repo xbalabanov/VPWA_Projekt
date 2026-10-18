@@ -98,7 +98,9 @@ export default defineConfig((/* ctx */) => {
       },
 
       // iconSet: 'material-icons', // Quasar icon set
-      // lang: 'en-US', // Quasar language pack
+      // Slovenské texty vstavaných Quasar komponentov (napr. tlačidlá v dialógoch).
+      // https://v2.quasar.dev/options/quasar-language-packs
+      lang: 'sk',
 
       // For special cases outside of where the auto-import strategy can have an impact
       // (like functional components as one of the examples),

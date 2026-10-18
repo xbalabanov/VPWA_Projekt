@@ -12,11 +12,21 @@
 :root {
   --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 
-  --bg: oklch(0.985 0.003 160); // plocha so správami
-  --sidebar: oklch(0.96 0.006 160); // bočné panely
-  --surface: oklch(0.995 0.002 160); // vstupné pole, karty
-  --hover: oklch(0.925 0.008 160);
-  --border: oklch(0.89 0.008 160);
+  // Vrstvy od najhlbšej: bočný panel (sidebar) -> plocha so správami (bg) -> vyvýšené
+  // prvky (surface: príkazový riadok, aktívny kanál, menu). Rozdiel svetlosti dáva hĺbku.
+  --bg: oklch(0.99 0.003 160); // plocha so správami
+  --sidebar: oklch(0.955 0.008 160); // bočné panely
+  --surface: oklch(0.997 0.002 160); // vstupné pole, karty
+  --hover: oklch(0.94 0.008 160);
+  --border: oklch(0.895 0.009 160);
+
+  // Tiene iba pre prvky, ktoré naozaj ležia nad stránkou (menu, dialógy, notifikácie).
+  // Ploché časti (panely, aktívny kanál, príkazový riadok) majú len rámik.
+  --shadow-sm: 0 1px 2px oklch(0.25 0.02 160 / 0.07), 0 0 0 1px oklch(0.25 0.02 160 / 0.03);
+  --shadow-md: 0 6px 20px -6px oklch(0.25 0.03 160 / 0.16), 0 1px 3px oklch(0.25 0.02 160 / 0.06);
+
+  --radius-sm: 6px;
+  --radius: 10px;
 
   --text: oklch(0.24 0.015 160);
   --text-muted: oklch(0.47 0.015 160); // kontrast ~6:1 na --bg
@@ -41,16 +51,21 @@
   --danger: oklch(0.52 0.18 27); // chyby (príkazový riadok, formuláre)
   --danger-soft: oklch(0.95 0.03 27);
 
-  // Quasar komponenty (color="primary", tmavé panely) čítajú tieto premenné.
+  // Quasar komponenty (color="primary", "negative", tmavé panely) čítajú tieto premenné.
   --q-primary: var(--accent);
+  --q-positive: var(--accent);
+  --q-negative: var(--danger);
 }
 
 body.body--dark {
-  --bg: oklch(0.2 0.008 160);
-  --sidebar: oklch(0.17 0.008 160);
-  --surface: oklch(0.24 0.009 160);
+  --bg: oklch(0.205 0.008 160);
+  --sidebar: oklch(0.165 0.008 160);
+  --surface: oklch(0.245 0.01 160);
   --hover: oklch(0.27 0.01 160);
-  --border: oklch(0.31 0.01 160);
+  --border: oklch(0.315 0.011 160);
+
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.35), 0 0 0 1px oklch(1 0 0 / 0.02);
+  --shadow-md: 0 8px 24px -8px oklch(0 0 0 / 0.55), 0 1px 3px oklch(0 0 0 / 0.3);
 
   --text: oklch(0.93 0.008 160);
   --text-muted: oklch(0.76 0.01 160);
@@ -87,6 +102,27 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+// Čísla rovnakej šírky (časy, počty), aby sa pod sebou nekývali.
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+// Klávesová skratka v nápovede (napr. Enter, /, @).
+kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.6875rem;
+  line-height: 16px;
+  text-align: center;
+}
+
 // Viditeľný fokus pre klávesnicu (WCAG 2.4.7), myš ho nezobrazuje.
 :focus-visible {
   outline: 2px solid var(--focus);
@@ -103,6 +139,153 @@ body {
 body.body--dark .user-avatar {
   background: oklch(0.4 0.07 var(--hue));
   color: oklch(0.93 0.04 var(--hue));
+}
+
+// ---------------------------------------------------------------------------
+// Quasar prvky, ktoré sa vykresľujú mimo komponentov (priamo do <body>): menu,
+// dialógy, tooltipy, notifikácie. <style scoped> v komponente na ne nedosiahne,
+// preto sú tu globálne a používajú rovnaké tokeny ako zvyšok aplikácie.
+// Triedy (.q-menu, .q-card, ...) sú z dokumentácie Quasaru: https://v2.quasar.dev/vue-components
+// ---------------------------------------------------------------------------
+
+// Menu (napr. menu používateľa, možnosti kanála): vyvýšená plocha s rámikom a tieňom.
+.q-menu {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+}
+.q-menu > .q-list {
+  padding: 4px;
+}
+.q-menu .q-item {
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+}
+.q-menu .q-item__section--avatar {
+  min-width: 28px;
+  color: var(--text-muted);
+}
+.q-menu .q-item__label--header {
+  padding: 8px 10px 4px;
+  color: var(--text-subtle);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+// Hover a fokus položky: náš odtieň namiesto Quasar sivej.
+.q-item.q-focusable:focus > .q-focus-helper,
+.q-item--clickable:hover > .q-focus-helper {
+  opacity: 0;
+}
+.q-menu .q-item--clickable:hover,
+.q-menu .q-item.q-focusable:focus-visible {
+  background: var(--hover);
+}
+// Nebezpečná akcia v menu (zrušenie kanála).
+.q-item.item-danger,
+.q-item.item-danger .q-item__section--avatar {
+  color: var(--danger);
+}
+
+.q-separator {
+  background: var(--border);
+}
+.q-menu .q-separator {
+  margin: 4px 6px;
+}
+
+.q-item__label--caption {
+  color: var(--text-subtle);
+}
+
+// Dialógy (vytvorenie kanála, potvrdenie zrušenia): karta s rámikom a väčším zaoblením.
+.q-dialog__backdrop {
+  background: oklch(0.2 0.02 160 / 0.4);
+}
+.q-dialog .q-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+}
+.q-dialog .q-card__section .text-h6 {
+  font-size: 1.0625rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.q-dialog .q-card__actions {
+  gap: 4px;
+  padding: 8px 16px 16px;
+}
+
+// Tlačidlá s textom: rovnaké zaoblenie všade (okrúhle ikony nechávame okrúhle).
+.q-btn:not(.q-btn--round) {
+  border-radius: var(--radius-sm);
+}
+.q-btn--no-uppercase {
+  font-weight: 600;
+}
+
+// Vstupné polia (outlined): naše farby rámika a zaoblenie.
+.q-field--outlined .q-field__control {
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.q-field--outlined .q-field__control::before {
+  border-color: var(--border);
+}
+.q-field--outlined:hover .q-field__control::before {
+  border-color: var(--text-subtle);
+}
+.q-field__label,
+.q-field__prefix {
+  color: var(--text-subtle);
+}
+.q-field__native {
+  color: var(--text);
+}
+.q-field__bottom {
+  color: var(--text-subtle);
+}
+
+// Tooltip: malý tmavý štítok (v tmavom režime svetlý), rovnaký ako v macOS.
+.q-tooltip {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+// Notifikácie (Notify): plocha s rámikom a tieňom namiesto plnej farby.
+// Typ (úspech/chyba) nesie farba celého rámika a ikony, nie bočný pásik.
+.q-notification {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface) !important; // Quasar nastaví bg-* triedu podľa color
+  box-shadow: var(--shadow-md);
+  color: var(--text) !important;
+}
+.q-notification .q-notification__icon {
+  color: var(--accent);
+}
+.q-notification.bg-positive {
+  border-color: color-mix(in oklch, var(--accent) 45%, var(--border));
+}
+.q-notification.bg-negative {
+  border-color: color-mix(in oklch, var(--danger) 50%, var(--border));
+  color: var(--danger) !important;
+}
+.q-notification.bg-negative .q-notification__icon {
+  color: var(--danger);
+}
+.q-notification__caption {
+  color: var(--text-muted);
+  opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
