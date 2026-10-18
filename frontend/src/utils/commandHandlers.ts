@@ -10,13 +10,13 @@ export function executeCommand(parsed: ParsedInput): string | null {
   const channelsStore = useChannelsStore();
   const [arg = ''] = parsed.args;
 
-  //join funguje aj bez aktiv channelu
+  //join funguje aj bez aktívneho kanála (napr. hned po registracii)
   if (parsed.command === 'join') {
     const isPrivate = parsed.args[1]?.toLowerCase() === 'private';
     return channelsStore.joinChannel(arg, isPrivate);
   }
 
-  //ostatne prikazy sa tykaju aktiv channela
+  //ostatne prikazy sa tykaju aktivneho kanalu
   const channelId = channelsStore.activeChannelId;
   if (channelId === null) return 'Najprv vyber kanál';
 
@@ -28,10 +28,10 @@ export function executeCommand(parsed: ParsedInput): string | null {
     case 'kick':
       return channelsStore.kickUser(channelId, arg);
     case 'cancel':
-      //admin zrusi channel, inak len member odide
+      //member odide, ked je member zaroven admin --> kanal sa rusi, (riesi leaveChannel)
       return channelsStore.leaveChannel(channelId);
     case 'quit':
-      //iba admin zrusi channel
+      //zrusit kanal vie iba admin (kontroluje deleteChannel)
       return channelsStore.deleteChannel(channelId);
     case 'list':
       return channelsStore.openMembersList(channelId);

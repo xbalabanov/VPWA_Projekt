@@ -1,3 +1,5 @@
+<!-- Registracia (UC1), po nej je pouzivatel rovno prihlaseny. Vlastnik: Stanislav (A1). -->
+
 <template>
   <section>
     <h1 class="auth-title">Vytvoriť účet</h1>

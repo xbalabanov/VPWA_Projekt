@@ -1,3 +1,5 @@
+<!-- Prihlasenie (UC1) Vlastnik: Stanislav (A1) -->
+
 <template>
   <section>
     <h1 class="auth-title">Prihlásenie</h1>
@@ -57,6 +59,8 @@ export default defineComponent({
         return;
       }
       this.$q.notify({ message: 'Prihlásený', color: 'positive' });
+
+      // hned otvorime prvy kanal, aby sa po prihlaseni neukazal prazdny chat
       useChannelsStore().selectFirstChannel();
       void this.$router.push('/');
     },

@@ -64,7 +64,7 @@ export default defineComponent({
       return this.channelsStore.activeChannel?.adminId ?? null;
     },
 
-    //clenovia aktivneho kanala zoradeni podla stavu, potom podla abecedy
+    //clenovia aktivneho kanala, zoradeni podla stavu, potom podla abecedy
     members(): User[] {
       const channelId = this.channelsStore.activeChannelId;
       if (channelId === null) return [];

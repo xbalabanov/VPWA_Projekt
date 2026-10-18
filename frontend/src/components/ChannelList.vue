@@ -239,7 +239,7 @@ export default defineComponent({
         this.showError(error);
         return;
       }
-      //zavriet a vycistit dialog pre dalsie pouzitie
+      //zavriet a vycistit dialog, aby bol pri dalsom otvoreni prazdny
       this.createOpen = false;
       this.newName = '';
       this.newPrivate = false;
