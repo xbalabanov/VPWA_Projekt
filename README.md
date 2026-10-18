@@ -1,6 +1,6 @@
 # VPWA Chat
 
-Maksym Balabanov, Stanislav Polak · VPWA, FIIT STU
+Maksym Balabanov, Stanislav Polák · VPWA, FIIT STU
 
 Progresívna webová aplikácia na textovú komunikáciu v štýle IRC/Slack: verejné a súkromné kanály, správy s infinite scrollom, príkazy (`/join`, `/invite`, `/kick`…), `@zmienky`, notifikácie, stav používateľa a „X píše…“.
 
