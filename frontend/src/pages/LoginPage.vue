@@ -1,7 +1,11 @@
+<!-- Prihlasenie (UC1) Vlastnik: Stanislav (A1) -->
+
 <template>
   <section>
     <h1 class="auth-title">Prihlásenie</h1>
     <p class="auth-subtitle">Prihlás sa a pokračuj v rozhovoroch.</p>
+
+    <!-- lazy-rules: chyby sa ukazu az po opusteni pola, nie po kazdom characteri -> menej requestov. Zdroj: https://v2.quasar.dev/vue-components/input#internal-validation -->
 
     <q-form @submit="onSubmit" class="q-gutter-md">
       <q-input
@@ -9,6 +13,7 @@
         label="Email"
         type="email"
         outlined
+        lazy-rules
         :rules="[
           (val) => !!val || 'Zadaj email',
           (val) => val.includes('@') || 'Email musí obsahovať @',
@@ -20,7 +25,8 @@
         label="Heslo"
         type="password"
         outlined
-        :rules="[(val) => val.length >= 6 || 'Aspoň 6 znakov']"
+        lazy-rules
+        :rules="[(val) => !!val || 'Zadaj heslo']"
       />
 
       <q-btn unelevated no-caps class="auth-submit" label="Prihlásiť sa" type="submit" />
@@ -53,6 +59,8 @@ export default defineComponent({
         return;
       }
       this.$q.notify({ message: 'Prihlásený', color: 'positive' });
+
+      // hned otvorime prvy kanal, aby sa po prihlaseni neukazal prazdny chat
       useChannelsStore().selectFirstChannel();
       void this.$router.push('/');
     },

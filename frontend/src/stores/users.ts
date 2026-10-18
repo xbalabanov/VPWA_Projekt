@@ -1,6 +1,6 @@
 // src/stores/users.ts
-// Spoločný základ: falošní používatelia a jednoduché vyhľadávanie. Akcie (prihlásenie,
-// zmena stavu, nastavenie notifikácií) pribudnú v úlohách A1, A7, B5 a B6.
+// pouzivatelia (falosne data), prihlasenie a registracia (UC1), stav a notifikacie (UC 8, 9)
+// prva faza - ziadny backend - vsetko zije v pamäti prehliadaca pomocou Pinia store
 import { defineStore } from 'pinia';
 import type { User, UserStatus } from '../types/models';
 
@@ -79,7 +79,7 @@ export const useUsersStore = defineStore('users', {
         state.users.find((u) => u.id === id),
 
     // Unikátnosť bez ohľadu na veľké/malé písmená (Jana = jana).
-    // RegisterPage ich volá v :rules, aby chyba bola vidno hneď pri písaní.
+    // RegisterPage ich volá v :rules, lazy-rules -> chyba je vidno az po opusteni pola
     isEmailTaken:
       (state) =>
       (email: string): boolean =>
@@ -114,19 +114,19 @@ export const useUsersStore = defineStore('users', {
       email: string;
       password: string;
     }): string | null {
-      //email a nickname musia byt unikat (formular to kontroluje tiez, toto je poistka)
+      //email a nickname musia byt unikat (formular to kontroluje tiez, toto je poistka - store sa nemoze spoliehat len na UI)
       if (this.isEmailTaken(data.email)) return 'Email je už použitý';
-      if (this.isNickNameTaken(data.nickName)) return 'NickName je už obsadený';
+      if (this.isNickNameTaken(data.nickName)) return 'Tento nick je už obsadený';
       const email = data.email.trim().toLowerCase();
 
       //nové id = najvacsie + 1 nez spravime databazu
+      //kym nemame databazu, id pridelujeme sami
       const id = Math.max(0, ...this.users.map((u) => u.id)) + 1;
 
-      // ...data skopiruje vsetky polia z formulara, zvysok doplnime
-      // email ulozime malymi pismenami, aby login fungoval aj pri inom pisani
+      // ...data skopiruje vsetky polia z formulara, email ukladame malymi pismenami, aby prihlasenie fungovalo bez ohladu na velkost pismen
       this.users.push({ ...data, email, id, status: 'online', notifyMentionsOnly: false });
 
-      //po registracii rovno prihlasime
+      //po registracii rovno prihlasime (UC1)
       this.currentUserId = id;
       return null;
     },

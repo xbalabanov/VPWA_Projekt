@@ -1,6 +1,6 @@
 // src/stores/channels.ts
-// Spoločný základ: falošné kanály, členstvá a pozvánky + jednoduché vyhľadávanie.
-// Akcie kanálov (vytvorenie, pozvánky, /join, /kick, ...) pribudnú v úlohách A2-A8.
+// kanaly, clenstva, pozvanky, hlasovanie o vyhodeni a zakazy (UC 2, 4, 5, 10)
+// Akcie vracaju null pri uspechu, inak text chyby, ktory UI ukaze userovi
 import { defineStore } from 'pinia';
 import type { Ban, Channel, ChannelMember, Invitation, KickVote } from '../types/models';
 import { useUsersStore } from './users';
@@ -12,13 +12,15 @@ interface ChannelsState {
   kickVotes: KickVote[];
   bans: Ban[];
   activeChannelId: number | null;
-  membersOpen: boolean; //pravy panel so zoznamom clenov
+  membersOpen: boolean; //pravy panel so zoznamom clenov (otvori ho aj /list)
 }
 
 // Pevný dátum pre falošné členstvá, aby sa mock dáta nemenili pri každom spustení.
 const JOINED_AT = '2026-09-25T10:00:00.000Z';
+//kolko roznych memberov musi dat /kick, kym sa odstrani user vo verejnom kanali (UC 4)
 const KICK_VOTES_FOR_BAN = 3;
 
+//skratka pre zaznam o clenstve (v mock datach aj akciach)
 function member(channelId: number, userId: number): ChannelMember {
   return { channelId, userId, joinedAt: JOINED_AT };
 }
@@ -156,8 +158,7 @@ export const useChannelsStore = defineStore('channels', {
       this.activeChannelId = id;
     },
 
-    //vrati null pri uspechu, inak text chyby
-    //tvorca je admin aj clen naraz
+    //novy kanal (UC 2), tvorca je zaroven admin aj prvy clen, kanal sa hned otvori
     createChannel(name: string, isPrivate: boolean): string | null {
       const userId = useUsersStore().currentUserId;
       if (userId === null) return 'Nie si prihlásený';
@@ -177,12 +178,14 @@ export const useChannelsStore = defineStore('channels', {
       return null;
     },
 
+    // zrusenie kanala adminom (UC 2, /quit)
     deleteChannel(channelId: number): string | null {
       const userId = useUsersStore().currentUserId;
       if (userId === null) return 'Nie si prihlásený';
       if (!this.isAdmin(channelId, userId)) return 'Kanál môže zmazať iba admin';
 
       //filter necha iba prvky kde je podmienka true -> tuto nechaj vsetko okrem tohoto kanala
+      //spolu s kanalom zmazeme vsetko, co nan odkazuje, aby v store nezostali zaznamy bez kanala
       this.channels = this.channels.filter((c) => c.id !== channelId);
       this.members = this.members.filter((m) => m.channelId !== channelId);
       this.invitations = this.invitations.filter((i) => i.channelId !== channelId);
@@ -193,6 +196,7 @@ export const useChannelsStore = defineStore('channels', {
       return null;
     },
 
+    //opustenie kanala (/cancel), ak odide admin -> kanal zanikne
     leaveChannel(channelId: number): string | null {
       const userId = useUsersStore().currentUserId;
       if (userId === null) return 'Nie si prihlásený';
@@ -200,7 +204,7 @@ export const useChannelsStore = defineStore('channels', {
 
       if (this.isAdmin(channelId, userId)) return this.deleteChannel(channelId);
 
-      //zo clenstiev odstrani zaznam, kde sedi kanal aj pouzivatel a ostantni pouzivatelia ostanu
+      //odstranime iba svoje clenstvo, ostatni clenovia ostanu
       this.members = this.members.filter(
         (m) => !(m.channelId === channelId && m.userId === userId),
       );
@@ -209,7 +213,7 @@ export const useChannelsStore = defineStore('channels', {
       return null;
     },
 
-    //accept invite - pozvanka sa despawne a pozuzivatel sa stane clenom kanala
+    //prijatie pozvanky (UC2): z pozvanky sa stane clenstvo a kanal sa otvori
     acceptInvitation(invitationId: number): string | null {
       const invitation = this.invitations.find((i) => i.id === invitationId);
       if (!invitation) return 'Pozvánka neexistuje';
@@ -221,7 +225,7 @@ export const useChannelsStore = defineStore('channels', {
       return null;
     },
 
-    //odmietnutie pozvanky: zmaze pozvanku a kanal zmizne zo zoznamu
+    //odmietnutie pozvanky: zmaze pozvanku a kanal zmizne zo zoznamu, clenom sa user nestane
     declineInvitation(invitationId: number): string | null {
       if (!this.invitations.some((i) => i.id === invitationId)) return 'Pozvánka neexistuje';
 
@@ -229,12 +233,14 @@ export const useChannelsStore = defineStore('channels', {
       return null;
     },
 
+    //bez kontrol, tie robi akcia co tuto vola (revokeUser, banUser)
     removeMember(channelId: number, userId: number): void {
       this.members = this.members.filter(
         (m) => !(m.channelId === channelId && m.userId === userId),
       );
     },
 
+    //BAN (UC 4): vyhodi membera, zmaze hlasy proti nemu a zapise ban. Zrusit ho vie admin cez /invite
     banUser(channelId: number, userId: number): void {
       this.removeMember(channelId, userId);
       this.kickVotes = this.kickVotes.filter(
@@ -243,14 +249,14 @@ export const useChannelsStore = defineStore('channels', {
       if (!this.isBanned(channelId, userId)) this.bans.push({ channelId, userId });
     },
 
-    //otvor privy kanel, kde je pouzivatel clenom (alebo nic) - vola sa po logine, registracii,
-    // a ked pouzivatel opusti alebo zrusi aktivny channel
+    //otvori prvy kanal, kde som clenom (alebo ziadny). Vola sa po prihlaseni a registracii, a ked opustim/zrusim aktivny kanal
     selectFirstChannel(): void {
       this.activeChannelId = this.myChannels[0]?.id ?? null;
       //?. -> ak neexistuje [0], vrati undefined
       //?? null -> ak undefined, pouzi null
     },
 
+    // /join nazov [private] (UC 4): neexistujuci kanal sa vytvori, do verejneho sa volajuci prida, do sukromneho iba cez pozvanku
     joinChannel(name: string, isPrivate: boolean): string | null {
       const userId = useUsersStore().currentUserId;
       if (userId === null) return 'Nie si prihlásený';
@@ -266,8 +272,8 @@ export const useChannelsStore = defineStore('channels', {
       if (this.isBanned(channel.id, userId)) return 'Máš zakázaný prístup do tohto kanála';
 
       this.members.push(member(channel.id, userId));
-      //ak som mal pozvnaku, uz netreba
 
+      //ak som mal do kanala pozvanku, uz nie je potrebna
       this.invitations = this.invitations.filter(
         (i) => !(i.channelId === channel.id && i.invitedUserId === userId),
       );
@@ -275,6 +281,7 @@ export const useChannelsStore = defineStore('channels', {
       return null;
     },
 
+    // /invite nick (UC 5): do sukromneho channelu pozyva len admin, jeho pozvanka rusi aj ban
     inviteUser(channelId: number, nickName: string): string | null {
       const usersStore = useUsersStore();
       const userId = usersStore.currentUserId;
@@ -309,6 +316,7 @@ export const useChannelsStore = defineStore('channels', {
       return null;
     },
 
+    // /revoke nick (UC 5): spravca sukromneho kanala odoberie clena alebo zrusi pozvanku
     revokeUser(channelId: number, nickName: string): string | null {
       const usersStore = useUsersStore();
       const userId = usersStore.currentUserId;
@@ -339,6 +347,7 @@ export const useChannelsStore = defineStore('channels', {
       return null;
     },
 
+    // /kick nick (to sa rymuje) (UC 4): spravca vyhodi hned, vo verejnom kanali rozhodne demokracia (hlasy memberov)
     kickUser(channelId: number, nickName: string): string | null {
       const usersStore = useUsersStore();
       const userId = usersStore.currentUserId;
@@ -371,6 +380,7 @@ export const useChannelsStore = defineStore('channels', {
       return null;
     },
 
+    // /list (UC 10): otvori pravy panel so zoznamom clenov
     openMembersList(channelId: number): string | null {
       const userId = useUsersStore().currentUserId;
       if (userId === null) return 'Nie si prihlásený';

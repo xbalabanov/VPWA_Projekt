@@ -1,9 +1,12 @@
+<!-- Registracia (UC1), po nej je pouzivatel rovno prihlaseny. Vlastnik: Stanislav (A1). -->
+
 <template>
   <section>
     <h1 class="auth-title">Vytvoriť účet</h1>
     <p class="auth-subtitle">Zvoľ si nick, cez ktorý ťa ostatní oslovia (@nick).</p>
 
     <!-- @submit sa zavolá iba ak prejdú všetky :rules -->
+    <!-- lazy-rules: chyby sa ukazu az po opusteni pola, nie po kazdom characteri -> menej requestov. Zdroj: https://v2.quasar.dev/vue-components/input#internal-validation -->
     <q-form @submit="onSubmit" class="q-gutter-xs">
       <!-- meno a priezvisko vedla seba, aby sa formular zmestil bez scrollovania -->
       <div class="name-row">
@@ -11,6 +14,7 @@
           v-model="firstName"
           label="Meno"
           outlined
+          lazy-rules
           dense
           :rules="[(val) => !!val.trim() || 'Zadaj meno']"
         />
@@ -19,6 +23,7 @@
           v-model="lastName"
           label="Priezvisko"
           outlined
+          lazy-rules
           dense
           :rules="[(val) => !!val.trim() || 'Zadaj priezvisko']"
         />
@@ -28,11 +33,12 @@
         v-model="nickName"
         label="Nick"
         outlined
+        lazy-rules
         dense
         :rules="[
           (val) => !!val || 'Zadaj nick',
           // bez medzier a @, aby neskôr fungovalo @nickname aj /invite nickName
-          (val) => /^[A-Za-z0-9_.-]+$/.test(val) || 'Iba písmená, čísla, _ . -',
+          (val) => isValidNickName(val) || 'Iba pismena, cisla, _ . - (nesmie koncit . ani -)',
           (val) => !usersStore.isNickNameTaken(val) || 'Tento nick je už obsadený',
         ]"
       />
@@ -42,6 +48,7 @@
         label="Email"
         type="email"
         outlined
+        lazy-rules
         dense
         :rules="[
           (val) => !!val || 'Zadaj email',
@@ -55,6 +62,7 @@
         label="Heslo"
         type="password"
         outlined
+        lazy-rules
         dense
         :rules="[(val) => val.length >= 6 || 'Aspoň 6 znakov']"
       />
@@ -64,6 +72,7 @@
         label="Heslo znova"
         type="password"
         outlined
+        lazy-rules
         dense
         :rules="[(val) => val === password || 'Heslá sa nezhodujú']"
       />
@@ -80,6 +89,7 @@ import { defineComponent } from 'vue';
 import { mapStores } from 'pinia';
 import { useUsersStore } from '../stores/users';
 import { useChannelsStore } from '../stores/channels';
+import { NICK_NAME_PATTERN } from '../utils/mentions';
 
 export default defineComponent({
   name: 'RegisterPage',
@@ -101,6 +111,11 @@ export default defineComponent({
   },
 
   methods: {
+    //rovnaky vzor ako pri @zmienkach, inak by sa niektori pouzivatelia nedali zmienit
+    isValidNickName(val: string): boolean {
+      return NICK_NAME_PATTERN.test(val);
+    },
+
     onSubmit() {
       // passwordAgain do store neposielame, slúži iba na kontrolu vo formulári
       const error = this.usersStore.register({
