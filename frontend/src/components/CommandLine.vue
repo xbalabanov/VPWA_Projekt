@@ -267,7 +267,7 @@ export default defineComponent({
 
       // Príkaz vykoná commandHandlers.ts (Stanislav); vráti null alebo text chyby.
       if (parsed.kind === 'command') {
-        const error = executeCommand(parsed);
+        const error = await executeCommand(parsed);
         if (error) this.error = error;
         else this.text = '';
         return;
