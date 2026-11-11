@@ -51,6 +51,29 @@ Server je na [http://localhost:3333](http://localhost:3333). Frontend spusti v d
 
 Súbory v `.adonisjs/` sa generujú pri inicializácii cez Ace, napríklad pri `node ace migration:run` alebo `npm run dev`. Pred prvou typovou kontrolou na čerstvom checkoute najprv vykonaj postup spustenia vyššie.
 
+## Demo dáta
+
+Seeder `database/seeders/channels_demo_seeder.ts` pripraví účty a kanály pre scenár kontroly z [plánu druhej fázy](../docs/faza-2.md):
+
+```bash
+node ace db:seed
+# alebo celá databáza načisto:
+node ace migration:fresh --seed
+```
+
+Heslo všetkých demo účtov je **`heslo123`**.
+
+| Účet | Email | Rola v deme |
+| --- | --- | --- |
+| Ed | `ed@example.com` | správca `general`, `projekt` a `stary-kanal` |
+| Jana | `jana@example.com` | hlasujúca členka, správkyňa `novinky` |
+| Peter | `peter@example.com` | hlasujúci člen |
+| Mária | `maria@example.com` | hlasujúca členka |
+| Tomáš | `tomas@example.com` | cieľ hlasovania o vyhodenie v `general` |
+| Lucia | `lucia@example.com` | nečlen, má pozvánku do súkromného `projekt` |
+
+Kanály: `general` (verejný, Ed + Jana, Peter, Mária, Tomáš), `projekt` (súkromný, Ed + Jana), `stary-kanal` (posledná aktivita pred 40 dňami, zanikne pri prvom prístupe) a `novinky` (čerstvý). Opakované spustenie seedera demo kanály vytvorí načisto.
+
 ## Overenie
 
 ```bash
