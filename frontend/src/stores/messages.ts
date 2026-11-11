@@ -2,10 +2,14 @@
 // Store pre správy (B7, UC 3, 6, 7, 8, 11): falošný server s históriou, stránkované
 // načítanie (infinite scroll), odoslanie správy, zmienky @nickname a rozpísané správy.
 import { defineStore } from 'pinia';
-import type { Mention, Message } from '../types/models';
-import { useUsersStore } from './users';
-import { extractNickNames } from '../utils/mentions';
 import { Notify } from 'quasar';
+import type { Mention, Message } from '../types/models';
+import type { MessageDto, MessagesPageDto } from '../types/api';
+import { useUsersStore } from './users.ts';
+import { extractNickNames } from '../utils/mentions.ts';
+import messageService from '../services/MessageService.ts';
+
+type MessagesSource = 'mock' | 'api';
 
 interface MessagesState {
   messages: Message[]; // načítané správy; v rámci kanála od najstaršej po najnovšiu
@@ -13,6 +17,10 @@ interface MessagesState {
   loading: Record<number, boolean>; // channelId -> práve načítavame?
   mentions: Mention[]; // koho ktorá načítaná správa zmieňuje (@nickname)
   drafts: Draft[]; // kto práve čo píše (zatiaľ len ja, neskôr aj ostatní cez WebSocket)
+  source: MessagesSource;
+  sourceVersion: number;
+  nextBeforeId: Record<number, number | null>;
+  loadErrors: Record<number, string | null>;
 }
 
 // Rozpísaná (ešte neodoslaná) správa pre "X píše…" (UC 11).
@@ -135,6 +143,16 @@ function postMessage(channelId: number, authorId: number, content: string): Prom
   });
 }
 
+function toMockMessageDto(message: Message): MessageDto {
+  const nickNames = new Set(extractNickNames(message.content).map((nick) => nick.toLowerCase()));
+
+  const mentionedUserIds = useUsersStore()
+    .users.filter((user) => nickNames.has(user.nickName.toLowerCase()))
+    .map((user) => user.id);
+
+  return { ...message, mentionedUserIds };
+}
+
 // Pinia store: state = dáta, getters = odvodené hodnoty, actions = zmeny dát.
 // https://pinia.vuejs.org/core-concepts/
 export const useMessagesStore = defineStore('messages', {
@@ -144,6 +162,10 @@ export const useMessagesStore = defineStore('messages', {
     loading: {},
     mentions: [],
     drafts: [],
+    source: 'mock',
+    sourceVersion: 0,
+    nextBeforeId: {},
+    loadErrors: {},
   }),
 
   // Getter s parametrom je funkcia, ktorá vracia funkciu: (state) => (id) => výsledok.
@@ -172,32 +194,97 @@ export const useMessagesStore = defineStore('messages', {
       (state) =>
       (channelId: number): Draft[] =>
         state.drafts.filter((d) => d.channelId === channelId),
+
+    loadErrorFor:
+      (state) =>
+      (channelId: number): string | null =>
+        state.loadErrors[channelId] ?? null,
   },
 
   actions: {
+    upsertApiMessages(incoming: MessageDto[]): void {
+      const messagesById = new Map<number, Message>(
+        this.messages.map((message) => [message.id, message]),
+      );
+
+      for (const dto of incoming) {
+        const { mentionedUserIds, ...message } = dto;
+
+        messagesById.set(message.id, message);
+
+        // Adresátov správy nahradíme aktuálnymi údajmi zo servera.
+        this.mentions = this.mentions.filter((mention) => mention.messageId !== message.id);
+
+        for (const userId of new Set(mentionedUserIds)) {
+          this.mentions.push({
+            messageId: message.id,
+            userId,
+          });
+        }
+      }
+
+      this.messages = [...messagesById.values()].sort((a, b) => a.id - b.id);
+    },
+
+    setSource(source: MessagesSource): void {
+      if (source === this.source) return;
+
+      this.sourceVersion += 1;
+      this.source = source;
+      this.messages = [];
+      this.mentions = [];
+      this.hasMore = {};
+      this.nextBeforeId = {};
+      this.loading = {};
+      this.loadErrors = {};
+      this.drafts = [];
+    },
+
     // Načíta ďalšiu (staršiu) stránku správ kanála.
     // Prvé volanie (nič ešte nemáme) načíta najnovšie správy.
     async loadOlder(channelId: number): Promise<void> {
-      // Poistka: už načítavame alebo už nič staršie nie je.
       if (this.loading[channelId] || !this.hasMoreFor(channelId)) return;
 
+      const version = this.sourceVersion;
+      const source = this.source;
+      const userId = useUsersStore().currentUserId;
+      const beforeId = this.nextBeforeId[channelId] ?? null;
+
       this.loading[channelId] = true;
+      this.loadErrors[channelId] = null;
+
       try {
-        // Kurzor = id najstaršej správy, ktorú už máme (alebo null).
-        const loaded = this.messagesByChannel(channelId);
-        const beforeId = loaded[0]?.id ?? null; // ?. = nespadni ak neexistuje, ?? = inak null
+        let page: MessagesPageDto;
 
-        const page = await fetchMessages(channelId, beforeId, PAGE_SIZE);
+        if (source === 'api') {
+          page = await messageService.loadMessages(channelId, beforeId);
+        } else {
+          const messages = await fetchMessages(channelId, beforeId, PAGE_SIZE);
+          const hasMore = messages.length === PAGE_SIZE;
 
-        // Staršie správy idú na začiatok poľa.
-        this.messages.unshift(...page);
-        this.rememberMentions(page);
+          page = {
+            messages: messages.map(toMockMessageDto),
+            hasMore,
+            nextBeforeId: hasMore ? (messages[0]?.id ?? null) : null,
+          };
+        }
 
-        // Menej ako plná stránka = došli sme na začiatok histórie.
-        this.hasMore[channelId] = page.length === PAGE_SIZE;
+        if (version !== this.sourceVersion || userId !== useUsersStore().currentUserId) {
+          return;
+        }
+
+        this.upsertApiMessages(page.messages);
+        this.hasMore[channelId] = page.hasMore;
+        this.nextBeforeId[channelId] = page.nextBeforeId;
+      } catch (error: unknown) {
+        if (version === this.sourceVersion && userId === useUsersStore().currentUserId) {
+          this.loadErrors[channelId] =
+            error instanceof Error ? error.message : 'Nepodarilo sa načítať správy.';
+        }
       } finally {
-        // finally sa vykoná vždy (aj pri chybe), aby loading nezostal navždy true.
-        this.loading[channelId] = false;
+        if (version === this.sourceVersion) {
+          this.loading[channelId] = false;
+        }
       }
     },
 
@@ -208,32 +295,47 @@ export const useMessagesStore = defineStore('messages', {
       if (authorId === null) return 'Nie si prihlásený';
 
       const text = content.trim();
-      if (!text) return null; // prázdnu správu ticho ignorujeme
+      if (!text) return null;
 
-      const message = await postMessage(channelId, authorId, text);
-      this.messages.push(message); // nová správa ide na koniec (je najnovšia)
-      this.rememberMentions([message]);
-      // Až po rememberMentions – notifikácia sa pýta isMentioned.
-      this.notifyAboutMessage(message);
-      return null;
+      const version = this.sourceVersion;
+      const source = this.source;
+
+      try {
+        const message =
+          source === 'api'
+            ? await messageService.sendMessage(channelId, text)
+            : toMockMessageDto(await postMessage(channelId, authorId, text));
+
+        if (version !== this.sourceVersion || authorId !== useUsersStore().currentUserId) {
+          return 'Používateľ alebo zdroj správ sa počas odosielania zmenil.';
+        }
+
+        this.upsertApiMessages([message]);
+
+        if (source === 'mock') this.notifyAboutMessage(message);
+
+        return null;
+      } catch (error: unknown) {
+        return error instanceof Error ? error.message : 'Nepodarilo sa odoslať správu.';
+      }
     },
 
     // Zapamätá si, koho správy zmieňujú. Skutočný server by Mention záznamy poslal sám,
     // tu ich dopočítame z textu. Iný store čítame podľa
     // https://pinia.vuejs.org/core-concepts/actions.html#Accessing-other-stores-actions
-    rememberMentions(messages: Message[]): void {
-      const usersStore = useUsersStore();
+    // rememberMentions(messages: Message[]): void {
+    //   const usersStore = useUsersStore();
 
-      for (const message of messages) {
-        for (const nickName of extractNickNames(message.content)) {
-          const user = usersStore.users.find(
-            (u) => u.nickName.toLowerCase() === nickName.toLowerCase(),
-          );
-          // Neexistujúci nick (preklep) nie je chyba, len ho ignorujeme.
-          if (user) this.mentions.push({ messageId: message.id, userId: user.id });
-        }
-      }
-    },
+    //   for (const message of messages) {
+    //     for (const nickName of extractNickNames(message.content)) {
+    //       const user = usersStore.users.find(
+    //         (u) => u.nickName.toLowerCase() === nickName.toLowerCase(),
+    //       );
+    //       // Neexistujúci nick (preklep) nie je chyba, len ho ignorujeme.
+    //       if (user) this.mentions.push({ messageId: message.id, userId: user.id });
+    //     }
+    //   }
+    // },
 
     // Nastaví môj rozpísaný text v kanáli; prázdny text = už nepíšem.
     setDraft(channelId: number, text: string): void {
