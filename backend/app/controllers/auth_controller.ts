@@ -32,19 +32,23 @@ export default class AuthController {
   async login({ request, auth, serialize }: HttpContext) {
     const { email, password } = await request.validateUsing(loginValidator)
 
-    // TODO Stanislav
-    void email
-    void password
-    void auth
-    return serialize({ todo: 'TODO Stanislav: login' })
+    //Nájde používateľa podľa emailu a porovná hash hesla.
+    //Pri zlom emaily alebo hesle vyhodí chybu 400 (E_INVALID_CREDENTIALS)
+    const user = await User.verifyCredentials(email, password)
+
+    //Uloží ID usera do seesion; prehliadač dostane session cookie.
+    await auth.use('web').login(user)
+
+    return serialize(UserTransformer.transform(user))
   }
 
   /**
    * POST /api/v1/account/logout – zruší prihlásenie v session.
    */
-  async logout({ auth }: HttpContext) {
-    // TODO Stanislav
-    void auth
-    return { message: 'TODO Stanislav: logout' }
+  async logout({ auth, serialize }: HttpContext) {
+    //Odstráni usera zo session, stará cookie už nikoho neprihlási
+    await auth.use('web').logout()
+
+    return serialize({ message: 'Odhlásený' })
   }
 }
