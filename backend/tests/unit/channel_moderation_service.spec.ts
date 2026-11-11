@@ -13,9 +13,11 @@ import ChannelModerationService from '#services/channel_moderation_service'
 test.group('ChannelModerationService', (group) => {
   group.each.setup(() => testUtils.db().withGlobalTransaction())
 
-  async function createUser(nickName: string) {
+  // Predpona t_, aby testy nekolidovali s demo účtami zo seedu (ed, jana…).
+  async function createUser(name: string) {
+    const nickName = `t_${name}`
     return User.create({
-      firstName: nickName,
+      firstName: name,
       lastName: 'Test',
       nickName,
       email: `${nickName}@test.sk`,
@@ -91,7 +93,7 @@ test.group('ChannelModerationService', (group) => {
 
     await assert.rejects(
       () => ChannelModerationService.invite(channel, jana.id, tomas),
-      'tomas má zakázaný prístup, pozvať ho môže iba správca'
+      't_tomas má zakázaný prístup, pozvať ho môže iba správca'
     )
 
     await ChannelModerationService.invite(channel, ed.id, tomas)
