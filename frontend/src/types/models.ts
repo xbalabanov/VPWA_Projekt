@@ -43,7 +43,15 @@ export interface Invitation {
   invitedUserId: number; // -> User.id (who is invited)
   invitedById: number; // -> User.id (who sent the invite)
   createdAt: string;
+  // Server posiela aj názov kanála a nick pozývajúceho, lebo adresát ešte nie je členom
+  // a kanál ani pozývajúceho inak nepozná.
+  channelName: string;
+  channelIsPrivate: boolean;
+  invitedByNickName: string;
 }
+
+// Verejné údaje člena kanála z GET /channels/:id/members (bez emailu a nastavení).
+export type Member = Pick<User, 'id' | 'firstName' | 'lastName' | 'nickName' | 'status'>;
 
 // One member's /kick vote against another member (3 votes -> Ban).
 export interface KickVote {

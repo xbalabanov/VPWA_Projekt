@@ -2,7 +2,7 @@
 // prihlasenie, registracia a odhlasenie cez backend (UC1), stav a notifikacie (UC 8, 9)
 // Prihlasenie drzi server v session (HttpOnly cookie), store si pamata iba profil.
 import { defineStore } from 'pinia';
-import type { User, UserStatus } from '../types/models';
+import type { Member, User, UserStatus } from '../types/models';
 import { ApiError, apiRequest, jsonBody } from '../services/api';
 import { useChannelsStore } from './channels';
 import { useMessagesStore } from './messages';
@@ -55,15 +55,20 @@ export const useUsersStore = defineStore('users', {
 
   actions: {
     // Pridá alebo aktualizuje používateľa v zozname známych (napr. po načítaní členov kanála).
-    rememberUser(user: User): void {
+    // Člen kanála prichádza bez emailu a nastavení, preto údaje iba doplníme a už známe
+    // (napr. môj email) neprepíšeme.
+    rememberUser(user: Member | User): void {
       const index = this.users.findIndex((u) => u.id === user.id);
-      if (index === -1) this.users.push(user);
-      else this.users[index] = user;
+      const known = this.users[index];
+      if (known) this.users[index] = { ...known, ...user };
+      else this.users.push({ email: '', notifyMentionsOnly: false, ...user });
     },
 
     setCurrentUser(user: User): void {
       this.rememberUser(user);
       this.currentUserId = user.id;
+      // Po prihlásení načítame kanály a pozvánky a začneme ich priebežne obnovovať.
+      useChannelsStore().startSync();
     },
 
     // Po F5 je store prázdny. Spýtame sa servera, či session cookie ešte platí.
@@ -116,6 +121,7 @@ export const useUsersStore = defineStore('users', {
     clearLocalData(): void {
       this.users = [];
       this.currentUserId = null;
+      useChannelsStore().stopSync();
       useChannelsStore().$reset();
       useMessagesStore().$reset();
     },

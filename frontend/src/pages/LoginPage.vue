@@ -46,7 +46,6 @@
 <script lang="ts">
 import { defineComponent } from 'vue';
 import { useUsersStore } from '../stores/users';
-import { useChannelsStore } from '../stores/channels';
 
 export default defineComponent({
   name: 'LoginPage',
@@ -70,8 +69,7 @@ export default defineComponent({
       }
       this.$q.notify({ message: 'Prihlásený', color: 'positive' });
 
-      // hned otvorime prvy kanal, aby sa po prihlaseni neukazal prazdny chat
-      useChannelsStore().selectFirstChannel();
+      // kanaly nacita a prvy otvori channels store (startSync po prihlaseni)
       void this.$router.push('/');
     },
   },
