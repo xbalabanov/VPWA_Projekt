@@ -1,6 +1,9 @@
-import type Channel from '#models/channel'
+import Channel from '#models/channel'
 import Invitation from '#models/invitation'
 import User from '#models/user'
+import Ban from '#models/ban'
+import KickVote from '#models/kick_vote'
+import db from '@adonisjs/lucid/services/db'
 import ChannelAccessService from '#services/channel_access_service'
 import ChannelMembershipService from '#services/channel_membership_service'
 import { Exception } from '@adonisjs/core/exceptions'
@@ -134,11 +137,18 @@ export default class ChannelModerationService {
    * trx: keď ban vzniká v rámci hlasovania, musí byť v tej istej transakcii.
    */
   static async ban(channelId: number, userId: number, trx?: TransactionClientContract) {
-    // TODO Stanislav
-    void channelId
-    void userId
-    void trx
-    throw new Exception('TODO Stanislav: ban', { status: 501 })
+    // Odoberie člena a zmaže jeho hlasy aj hlasy proti nemu.
+    await ChannelMembershipService.removeMember(channelId, userId, trx)
+
+    //Stará pozvánka by ban obišla (acceptne -> vráti sa)
+    await Invitation.query({ client: trx })
+      .where('channel_id', channelId)
+      .where('invited_user_id', userId)
+      .delete()
+
+    //Zápis banu; firstOrCreate nevytvorí duplikát, ak ban už jestvuje.
+    await Ban.firstOrCreate({ channelId, userId }, {}, { client: trx })
+    //udaost pre socket (B2): channel.deleted vyhodenému, membership.changed ostatným
   }
 
   /**
@@ -146,20 +156,37 @@ export default class ChannelModerationService {
    * Tretí rôzny hlas = ban. Celé v transakcii, aby dva súčasné hlasy nespravili chybu.
    */
   static async vote(channelId: number, voterId: number, targetId: number): Promise<KickResult> {
-    // TODO Stanislav
-    void channelId
-    void voterId
-    void targetId
-    throw new Exception('TODO Stanislav: vote', { status: 501 })
+    //Všetko v jeden transakcii: prejde celé alebo nič
+    // https://lucid.adonisjs.com/docs/transactions
+    return db.transaction(async (trx) => {
+      //Zamkneme riadok kanála, aby súćasné hlasy v tom istom kanáli išli po jednom
+      //a dvaja "tretí" hlasujúci nespravili 2x ban
+      await Channel.query({ client: trx }).where('id', channelId).forUpdate().first()
+
+      //Hlas zapíšeme iba raz - opakovaný hlas toho istého člena nič nepridá
+      await KickVote.firstOrCreate(
+        { channelId, targetUserId: targetId, voterId },
+        {},
+        { client: trx }
+      )
+
+      //spočítma rôznych hlasujúcich voči targetu
+      const votes = await KickVote.query({ client: trx })
+        .where('channel_id', channelId)
+        .where('target_user_id', targetId)
+
+      if (votes.length >= KICK_VOTES_FOR_BAN) {
+        await this.ban(channelId, targetId, trx)
+        return { banned: true, votes: votes.length }
+      }
+      return { banned: false, votes: votes.length }
+    })
   }
 
   /**
    * Zrušenie banu správcom (cez /invite).
    */
   static async unban(channelId: number, userId: number): Promise<void> {
-    // TODO Stanislav
-    void channelId
-    void userId
-    throw new Exception('TODO Stanislav: unban', { status: 501 })
+    await Ban.query().where('channel_id', channelId).where('user_id', userId).delete()
   }
 }
