@@ -34,4 +34,6 @@ vine.messagesProvider = new SimpleMessagesProvider({
   'email.database.unique': 'Email je už použitý',
   'passwordConfirmation.sameAs': 'Heslá sa nezhodujú',
   'password.minLength': 'Heslo musí mať aspoň {{ min }} znakov',
+  'name.database.unique': 'Kanál s týmto názvom už existuje',
+  'name.regex': 'Názov kanála môže obsahovať iba písmená, čísla, _ . -',
 })
