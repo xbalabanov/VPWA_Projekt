@@ -133,7 +133,6 @@ export class UserSchema extends BaseModel {
     'createdAt',
     'email',
     'firstName',
-    'fullName',
     'id',
     'lastName',
     'nickName',
@@ -149,8 +148,6 @@ export class UserSchema extends BaseModel {
   declare email: string
   @column()
   declare firstName: string
-  @column()
-  declare fullName: string | null
   @column({ isPrimary: true })
   declare id: number
   @column()

@@ -19,8 +19,8 @@ router
   .group(() => {
     router
       .group(() => {
-        router.post('signup', [controllers.NewAccount, 'store'])
-        router.post('login', [controllers.AccessTokens, 'store'])
+        router.post('signup', [controllers.Auth, 'signup'])
+        router.post('login', [controllers.Auth, 'login'])
       })
       .prefix('auth')
       .as('auth')
@@ -28,7 +28,7 @@ router
     router
       .group(() => {
         router.get('profile', [controllers.Profile, 'show'])
-        router.post('logout', [controllers.AccessTokens, 'destroy'])
+        router.post('logout', [controllers.Auth, 'logout'])
       })
       .prefix('account')
       .as('profile')

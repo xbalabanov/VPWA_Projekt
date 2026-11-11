@@ -1,26 +1,40 @@
 import vine from '@vinejs/vine'
 
-/**
- * Shared rules for email and password.
- */
-const email = () => vine.string().email().maxLength(254)
-const password = () => vine.string().minLength(8).maxLength(32)
+// Rovnaké pravidlo nicku ako vo frontend/src/utils/mentions.ts (registrácia aj @zmienky).
+const NICK_NAME_PATTERN = /^[A-Za-z0-9_.-]*[A-Za-z0-9_]$/
 
 /**
- * Validator to use when performing self-signup
+ * Registrácia (UC1).
+ * Email a nick ukladáme orezané a malými písmenami, aby Jana a jana boli ten istý
+ * používateľ. Unikátnosť overuje validátor (422 so správou), nie až DB index (500).
+ * https://vinejs.dev/docs/types/string
+ * https://docs.adonisjs.com/guides/basics/validation#unique-and-exists-validations
  */
 export const signupValidator = vine.create({
-  fullName: vine.string().nullable(),
-  email: email().unique({ table: 'users', column: 'email' }),
-  password: password(),
-  passwordConfirmation: password().sameAs('password'),
+  firstName: vine.string().trim().minLength(1).maxLength(100),
+  lastName: vine.string().trim().minLength(1).maxLength(100),
+  nickName: vine
+    .string()
+    .trim()
+    .toLowerCase()
+    .maxLength(30)
+    .regex(NICK_NAME_PATTERN)
+    .unique({ table: 'users', column: 'nick_name', caseInsensitive: true }),
+  email: vine
+    .string()
+    .trim()
+    .toLowerCase()
+    .email()
+    .maxLength(254)
+    .unique({ table: 'users', column: 'email', caseInsensitive: true }),
+  password: vine.string().minLength(6).maxLength(64),
+  passwordConfirmation: vine.string().sameAs('password'),
 })
 
 /**
- * Validator to use before validating user credentials
- * during login
+ * Prihlásenie. Email normalizujeme rovnako ako pri registrácii.
  */
 export const loginValidator = vine.create({
-  email: email(),
+  email: vine.string().trim().toLowerCase().email(),
   password: vine.string(),
 })
