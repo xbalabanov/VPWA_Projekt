@@ -7,3 +7,6 @@ Thumbs.db
 
 # Lokálne nastavenia Claude Code (napr. launch.json pre náhľad v prehliadači)
 .claude/
+
+# Automaticky generované súbory Adonisu
+.adonisjs/
