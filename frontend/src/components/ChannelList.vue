@@ -15,9 +15,9 @@
       >
         <div class="invite-title">
           <q-icon name="mail" size="16px" class="invite-icon" />
-          <span class="invite-name">{{ channelName(invitation.channelId) }}</span>
+          <span class="invite-name">{{ invitation.channelName }}</span>
         </div>
-        <div class="invite-from">od {{ nickName(invitation.invitedById) }}</div>
+        <div class="invite-from">od {{ invitation.invitedByNickName }}</div>
         <div class="invite-actions">
           <q-btn
             unelevated
@@ -189,12 +189,6 @@ export default defineComponent({
       this.$emit('select', id);
     },
 
-    // Kto pozval (pozvánka má iba id používateľa).
-    nickName(userId: number): string {
-      return this.usersStore.userById(userId)?.nickName ?? 'niekto';
-    },
-
-    // Pozvánka má iba channelId, názov si dohľadáme.
     channelName(channelId: number): string {
       return this.channelsStore.channels.find((c) => c.id === channelId)?.name ?? '';
     },
@@ -209,16 +203,17 @@ export default defineComponent({
       if (error) this.$q.notify({ message: error, color: 'negative' });
     },
 
-    accept(invitationId: number): void {
-      this.showError(this.channelsStore.acceptInvitation(invitationId));
+    async accept(invitationId: number): Promise<void> {
+      this.showError(await this.channelsStore.acceptInvitation(invitationId));
+      this.$emit('select', this.channelsStore.activeChannelId);
     },
 
-    decline(invitationId: number): void {
-      this.showError(this.channelsStore.declineInvitation(invitationId));
+    async decline(invitationId: number): Promise<void> {
+      this.showError(await this.channelsStore.declineInvitation(invitationId));
     },
 
-    leave(channelId: number): void {
-      this.showError(this.channelsStore.leaveChannel(channelId));
+    async leave(channelId: number): Promise<void> {
+      this.showError(await this.channelsStore.leaveChannel(channelId));
     },
 
     // Zrušenie je nevratné, preto sa najprv opýtame (Quasar Dialog plugin).
@@ -230,11 +225,13 @@ export default defineComponent({
           cancel: { label: 'Späť', flat: true, noCaps: true },
           ok: { label: 'Zrušiť kanál', color: 'negative', unelevated: true, noCaps: true },
         })
-        .onOk(() => this.showError(this.channelsStore.deleteChannel(channelId)));
+        .onOk(() => {
+          void this.channelsStore.deleteChannel(channelId).then((error) => this.showError(error));
+        });
     },
 
-    create(): void {
-      const error = this.channelsStore.createChannel(this.newName, this.newPrivate);
+    async create(): Promise<void> {
+      const error = await this.channelsStore.createChannel(this.newName.trim(), this.newPrivate);
       if (error) {
         this.showError(error);
         return;

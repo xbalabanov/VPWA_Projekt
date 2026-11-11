@@ -93,7 +93,6 @@
 import { defineComponent } from 'vue';
 import { mapStores } from 'pinia';
 import { useUsersStore } from '../stores/users';
-import { useChannelsStore } from '../stores/channels';
 import { NICK_NAME_PATTERN } from '../utils/mentions';
 
 export default defineComponent({
@@ -141,7 +140,6 @@ export default defineComponent({
       }
 
       this.$q.notify({ message: 'Účet vytvorený', color: 'positive' });
-      useChannelsStore().selectFirstChannel();
       void this.$router.push('/');
     },
   },

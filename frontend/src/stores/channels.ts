@@ -1,121 +1,46 @@
 // src/stores/channels.ts
-// kanaly, clenstva, pozvanky, hlasovanie o vyhodeni a zakazy (UC 2, 4, 5, 10)
+// kanaly, clenstva a pozvanky prihlaseneho pouzivatela (UC 2, 4, 5, 10)
+// Data drzi server, store je iba ich kopia pre UI. Pravidla (kto smie co) overuje server,
+// store len posle poziadavku a ulozi odpoved.
 // Akcie vracaju null pri uspechu, inak text chyby, ktory UI ukaze userovi
 import { defineStore } from 'pinia';
-import type { Ban, Channel, ChannelMember, Invitation, KickVote } from '../types/models';
+import type { Channel, ChannelMember, Invitation, Member } from '../types/models';
+import { ApiError, apiRequest, jsonBody } from '../services/api';
 import { useUsersStore } from './users';
 
 interface ChannelsState {
-  channels: Channel[];
-  members: ChannelMember[];
-  invitations: Invitation[];
-  kickVotes: KickVote[];
-  bans: Ban[];
+  channels: Channel[]; // iba kanaly, v ktorych som clenom
+  members: ChannelMember[]; // clenovia nacitanych kanalov (aktivny kanal)
+  invitations: Invitation[]; // moje pozvanky
   activeChannelId: number | null;
   membersOpen: boolean; //pravy panel so zoznamom clenov (otvori ho aj /list)
 }
 
-// Pevný dátum pre falošné členstvá, aby sa mock dáta nemenili pri každom spustení.
-const JOINED_AT = '2026-09-25T10:00:00.000Z';
-//kolko roznych memberov musi dat /kick, kym sa odstrani user vo verejnom kanali (UC 4)
-const KICK_VOTES_FOR_BAN = 3;
+// Kým nie je socket (B2), obnovujeme kanály a pozvánky každých 5 s a pri návrate do okna.
+// TODO socket (B2): po napojení socketu polling odstrániť a volať on* udalosti nižšie.
+const SYNC_INTERVAL_MS = 5000;
+let syncTimer: ReturnType<typeof setInterval> | null = null;
+let onWindowFocus: (() => void) | null = null;
 
-//skratka pre zaznam o clenstve (v mock datach aj akciach)
-function member(channelId: number, userId: number): ChannelMember {
-  return { channelId, userId, joinedAt: JOINED_AT };
+// Text chyby pre používateľa. Server posiela slovenské hlášky (403, 404, 422).
+function errorText(error: unknown): string {
+  if (error instanceof ApiError) return error.message;
+  return 'Server je nedostupný, skús to znova';
 }
 
 export const useChannelsStore = defineStore('channels', {
   state: (): ChannelsState => ({
-    // Falošné dáta pre prototyp. Neskôr ich nahradí volanie backendu v akcii.
-    channels: [
-      {
-        id: 1,
-        name: 'general',
-        isPrivate: false,
-        adminId: 1,
-        lastActivityAt: '2026-10-01T10:00:00.000Z',
-      },
-      {
-        id: 2,
-        name: 'vpwa-projekt',
-        isPrivate: true,
-        adminId: 2,
-        lastActivityAt: '2026-10-02T08:30:00.000Z',
-      },
-      {
-        id: 3,
-        name: 'random',
-        isPrivate: false,
-        adminId: 3,
-        lastActivityAt: '2026-09-28T19:45:00.000Z',
-      },
-      {
-        id: 4,
-        name: 'ucenie',
-        isPrivate: true,
-        adminId: 1,
-        lastActivityAt: '2026-09-30T14:20:00.000Z',
-      },
-      {
-        id: 5,
-        name: 'pokec',
-        isPrivate: false,
-        adminId: 2,
-        lastActivityAt: '2026-10-02T09:10:00.000Z',
-      },
-    ],
-    members: [
-      // general: všetci
-      member(1, 1),
-      member(1, 2),
-      member(1, 3),
-      member(1, 4),
-      member(1, 5),
-      // vpwa-projekt (ed je zatiaľ iba pozvaný)
-      member(2, 2),
-      member(2, 3),
-      // random
-      member(3, 1),
-      member(3, 3),
-      member(3, 4),
-      // ucenie
-      member(4, 1),
-      member(4, 2),
-      // pokec (ed je zatiaľ iba pozvaný)
-      member(5, 2),
-      member(5, 5),
-    ],
-    // Pozvánky pre prihláseného používateľa (ed).
-    invitations: [
-      {
-        id: 1,
-        channelId: 2,
-        invitedUserId: 1,
-        invitedById: 2,
-        createdAt: '2026-10-02T08:00:00.000Z',
-      },
-      {
-        id: 2,
-        channelId: 5,
-        invitedUserId: 1,
-        invitedById: 5,
-        createdAt: '2026-10-02T09:00:00.000Z',
-      },
-    ],
-    kickVotes: [],
-    bans: [],
-    activeChannelId: 1,
+    channels: [],
+    members: [],
+    invitations: [],
+    activeChannelId: null,
     membersOpen: false,
   }),
 
   getters: {
     // Kanály, v ktorých je prihlásený používateľ členom, podľa abecedy.
     myChannels(state): Channel[] {
-      const userId = useUsersStore().currentUserId;
-      return state.channels
-        .filter((c) => state.members.some((m) => m.channelId === c.id && m.userId === userId))
-        .sort((a, b) => a.name.localeCompare(b.name));
+      return [...state.channels].sort((a, b) => a.name.localeCompare(b.name));
     },
 
     activeChannel: (state): Channel | undefined =>
@@ -127,266 +52,217 @@ export const useChannelsStore = defineStore('channels', {
       (channelId: number): number[] =>
         state.members.filter((m) => m.channelId === channelId).map((m) => m.userId),
 
-    myInvitations(state): Invitation[] {
-      const userId = useUsersStore().currentUserId;
-      return state.invitations.filter((i) => i.invitedUserId === userId);
-    },
+    // Pozvánky navrchu zoznamu, najnovšie prvé (poradie posiela server).
+    myInvitations: (state): Invitation[] => state.invitations,
 
     channelByName:
       (state) =>
       (name: string): Channel | undefined =>
         state.channels.find((c) => c.name.toLowerCase() === name.toLowerCase()),
 
-    isMember:
-      (state) =>
-      (channelId: number, userId: number): boolean =>
-        state.members.some((m) => m.channelId === channelId && m.userId === userId),
-
     isAdmin:
       (state) =>
       (channelId: number, userId: number): boolean =>
         state.channels.some((c) => c.id === channelId && c.adminId === userId),
-
-    isBanned:
-      (state) =>
-      (channelId: number, userId: number): boolean =>
-        state.bans.some((b) => b.channelId === channelId && b.userId === userId),
   },
 
   actions: {
-    setActiveChannel(id: number) {
-      this.activeChannelId = id;
+    // ---- nacitanie zo servera ----
+
+    async fetchChannels(): Promise<void> {
+      this.channels = await apiRequest<Channel[]>('/channels');
+      // aktívny kanál mohol zaniknúť alebo ma z neho vyhodili
+      if (!this.channels.some((c) => c.id === this.activeChannelId)) this.selectFirstChannel();
     },
 
-    //novy kanal (UC 2), tvorca je zaroven admin aj prvy clen, kanal sa hned otvori
-    createChannel(name: string, isPrivate: boolean): string | null {
-      const userId = useUsersStore().currentUserId;
-      if (userId === null) return 'Nie si prihlásený';
-      if (this.channelByName(name)) return 'Kanál s týmto názvom už existuje';
-
-      const id = Math.max(0, ...this.channels.map((c) => c.id)) + 1;
-      this.channels.push({
-        id,
-        name,
-        isPrivate,
-        adminId: userId,
-        lastActivityAt: new Date().toISOString(),
-      });
-      this.members.push(member(id, userId));
-
-      this.activeChannelId = id;
-      return null;
+    async fetchInvitations(): Promise<void> {
+      this.invitations = await apiRequest<Invitation[]>('/invitations');
     },
 
-    // zrusenie kanala adminom (UC 2, /quit)
-    deleteChannel(channelId: number): string | null {
-      const userId = useUsersStore().currentUserId;
-      if (userId === null) return 'Nie si prihlásený';
-      if (!this.isAdmin(channelId, userId)) return 'Kanál môže zmazať iba admin';
+    // Členovia kanála; ich mená si zapamätá users store (zoznam členov, autori správ).
+    async fetchMembers(channelId: number): Promise<void> {
+      const members = await apiRequest<Member[]>(`/channels/${channelId}/members`);
+      const usersStore = useUsersStore();
+      members.forEach((m) => usersStore.rememberUser(m));
 
-      //filter necha iba prvky kde je podmienka true -> tuto nechaj vsetko okrem tohoto kanala
-      //spolu s kanalom zmazeme vsetko, co nan odkazuje, aby v store nezostali zaznamy bez kanala
+      this.members = [
+        ...this.members.filter((m) => m.channelId !== channelId),
+        ...members.map((m) => ({ channelId, userId: m.id, joinedAt: '' })),
+      ];
+    },
+
+    // Kanály, pozvánky a členovia aktívneho kanála naraz (po prihlásení a pri pollingu).
+    async refresh(): Promise<void> {
+      try {
+        await Promise.all([this.fetchChannels(), this.fetchInvitations()]);
+        if (this.activeChannelId !== null) await this.fetchMembers(this.activeChannelId);
+      } catch {
+        // výpadok servera: necháme posledné dáta, skúsi sa to pri ďalšom obnovení
+      }
+    },
+
+    startSync(): void {
+      this.stopSync();
+      void this.refresh();
+      // TODO socket (B2): nahradiť udalosťami zo socketu
+      syncTimer = setInterval(() => void this.refresh(), SYNC_INTERVAL_MS);
+      onWindowFocus = () => void this.refresh();
+      window.addEventListener('focus', onWindowFocus);
+    },
+
+    stopSync(): void {
+      if (syncTimer !== null) clearInterval(syncTimer);
+      if (onWindowFocus) window.removeEventListener('focus', onWindowFocus);
+      syncTimer = null;
+      onWindowFocus = null;
+    },
+
+    // ---- udalosti, ktore neskor zavola socket (B2) ----
+
+    // Niekto ma pozval – pozvánka sa objaví navrchu.
+    onInvitationCreated(invitation: Invitation): void {
+      if (!this.invitations.some((i) => i.id === invitation.id)) {
+        this.invitations.unshift(invitation);
+      }
+    },
+
+    // Kanál zanikol alebo som z neho odišiel/bol vyhodený – zmizne zo zoznamu.
+    onChannelDeleted(channelId: number): void {
       this.channels = this.channels.filter((c) => c.id !== channelId);
       this.members = this.members.filter((m) => m.channelId !== channelId);
       this.invitations = this.invitations.filter((i) => i.channelId !== channelId);
-      this.kickVotes = this.kickVotes.filter((v) => v.channelId !== channelId);
-      this.bans = this.bans.filter((b) => b.channelId !== channelId);
-
       if (this.activeChannelId === channelId) this.selectFirstChannel();
-      return null;
     },
 
-    //opustenie kanala (/cancel), ak odide admin -> kanal zanikne
-    leaveChannel(channelId: number): string | null {
-      const userId = useUsersStore().currentUserId;
-      if (userId === null) return 'Nie si prihlásený';
-      if (!this.isMember(channelId, userId)) return 'Nie si členom tohto kanála';
+    // Zmenili sa členovia kanála – znovu ich načítame.
+    async onMembershipChanged(channelId: number): Promise<void> {
+      await this.refresh();
+      if (this.channels.some((c) => c.id === channelId)) await this.fetchMembers(channelId);
+    },
 
-      if (this.isAdmin(channelId, userId)) return this.deleteChannel(channelId);
+    // ---- akcie pouzivatela ----
 
-      //odstranime iba svoje clenstvo, ostatni clenovia ostanu
-      this.members = this.members.filter(
-        (m) => !(m.channelId === channelId && m.userId === userId),
-      );
+    setActiveChannel(id: number) {
+      this.activeChannelId = id;
+      void this.fetchMembers(id).catch(() => undefined);
+    },
 
-      if (this.activeChannelId === channelId) this.selectFirstChannel();
-      return null;
+    //otvori prvy kanal, kde som clenom (alebo ziadny). Vola sa po nacitani kanalov, a ked opustim/zrusim aktivny kanal
+    selectFirstChannel(): void {
+      const first = this.myChannels[0];
+      if (first) this.setActiveChannel(first.id);
+      else this.activeChannelId = null;
+    },
+
+    // Pridá kanál do zoznamu (ak tam nie je) a otvorí ho.
+    openChannel(channel: Channel): void {
+      if (!this.channels.some((c) => c.id === channel.id)) this.channels.push(channel);
+      this.setActiveChannel(channel.id);
+    },
+
+    //novy kanal (UC 2), tvorca je zaroven admin aj prvy clen, kanal sa hned otvori
+    async createChannel(name: string, isPrivate: boolean): Promise<string | null> {
+      try {
+        const channel = await apiRequest<Channel>(
+          '/channels',
+          jsonBody('POST', { name, isPrivate }),
+        );
+        this.openChannel(channel);
+        return null;
+      } catch (error) {
+        return errorText(error);
+      }
+    },
+
+    // /join nazov [private] (UC 4): neexistujuci kanal server vytvori, do verejneho prida,
+    // do sukromneho iba cez pozvanku
+    async joinChannel(name: string, isPrivate: boolean): Promise<string | null> {
+      try {
+        const channel = await apiRequest<Channel>(
+          '/channels/join',
+          jsonBody('POST', { name, isPrivate }),
+        );
+        this.openChannel(channel);
+        return null;
+      } catch (error) {
+        return errorText(error);
+      }
+    },
+
+    // zrusenie kanala adminom (UC 2, /quit)
+    async deleteChannel(channelId: number): Promise<string | null> {
+      try {
+        await apiRequest(`/channels/${channelId}`, { method: 'DELETE' });
+        this.onChannelDeleted(channelId);
+        return null;
+      } catch (error) {
+        return errorText(error);
+      }
+    },
+
+    //opustenie kanala (/cancel), ak odide admin -> kanal zanikne (rozhodne server)
+    async leaveChannel(channelId: number): Promise<string | null> {
+      try {
+        await apiRequest(`/channels/${channelId}/membership`, { method: 'DELETE' });
+        this.onChannelDeleted(channelId);
+        return null;
+      } catch (error) {
+        return errorText(error);
+      }
     },
 
     //prijatie pozvanky (UC2): z pozvanky sa stane clenstvo a kanal sa otvori
-    acceptInvitation(invitationId: number): string | null {
-      const invitation = this.invitations.find((i) => i.id === invitationId);
-      if (!invitation) return 'Pozvánka neexistuje';
-
-      this.members.push(member(invitation.channelId, invitation.invitedUserId));
-      this.invitations = this.invitations.filter((i) => i.id !== invitationId);
-
-      this.activeChannelId = invitation.channelId;
-      return null;
+    async acceptInvitation(invitationId: number): Promise<string | null> {
+      try {
+        const channel = await apiRequest<Channel>(`/invitations/${invitationId}/accept`, {
+          method: 'POST',
+        });
+        this.invitations = this.invitations.filter((i) => i.id !== invitationId);
+        this.openChannel(channel);
+        return null;
+      } catch (error) {
+        return errorText(error);
+      }
     },
 
     //odmietnutie pozvanky: zmaze pozvanku a kanal zmizne zo zoznamu, clenom sa user nestane
-    declineInvitation(invitationId: number): string | null {
-      if (!this.invitations.some((i) => i.id === invitationId)) return 'Pozvánka neexistuje';
-
-      this.invitations = this.invitations.filter((i) => i.id !== invitationId);
-      return null;
-    },
-
-    //bez kontrol, tie robi akcia co tuto vola (revokeUser, banUser)
-    removeMember(channelId: number, userId: number): void {
-      this.members = this.members.filter(
-        (m) => !(m.channelId === channelId && m.userId === userId),
-      );
-    },
-
-    //BAN (UC 4): vyhodi membera, zmaze hlasy proti nemu a zapise ban. Zrusit ho vie admin cez /invite
-    banUser(channelId: number, userId: number): void {
-      this.removeMember(channelId, userId);
-      this.kickVotes = this.kickVotes.filter(
-        (v) => !(v.channelId === channelId && v.targetUserId === userId),
-      );
-      if (!this.isBanned(channelId, userId)) this.bans.push({ channelId, userId });
-    },
-
-    //otvori prvy kanal, kde som clenom (alebo ziadny). Vola sa po prihlaseni a registracii, a ked opustim/zrusim aktivny kanal
-    selectFirstChannel(): void {
-      this.activeChannelId = this.myChannels[0]?.id ?? null;
-      //?. -> ak neexistuje [0], vrati undefined
-      //?? null -> ak undefined, pouzi null
-    },
-
-    // /join nazov [private] (UC 4): neexistujuci kanal sa vytvori, do verejneho sa volajuci prida, do sukromneho iba cez pozvanku
-    joinChannel(name: string, isPrivate: boolean): string | null {
-      const userId = useUsersStore().currentUserId;
-      if (userId === null) return 'Nie si prihlásený';
-
-      const channel = this.channelByName(name);
-      if (!channel) return this.createChannel(name, isPrivate);
-
-      if (this.isMember(channel.id, userId)) {
-        this.activeChannelId = channel.id;
+    async declineInvitation(invitationId: number): Promise<string | null> {
+      try {
+        await apiRequest(`/invitations/${invitationId}`, { method: 'DELETE' });
+        this.invitations = this.invitations.filter((i) => i.id !== invitationId);
         return null;
+      } catch (error) {
+        return errorText(error);
       }
-      if (channel.isPrivate) return 'Kanál je súkromný, potrebuješ pozvánku';
-      if (this.isBanned(channel.id, userId)) return 'Máš zakázaný prístup do tohto kanála';
-
-      this.members.push(member(channel.id, userId));
-
-      //ak som mal do kanala pozvanku, uz nie je potrebna
-      this.invitations = this.invitations.filter(
-        (i) => !(i.channelId === channel.id && i.invitedUserId === userId),
-      );
-      this.activeChannelId = channel.id;
-      return null;
     },
 
-    // /invite nick (UC 5): do sukromneho channelu pozyva len admin, jeho pozvanka rusi aj ban
-    inviteUser(channelId: number, nickName: string): string | null {
-      const usersStore = useUsersStore();
-      const userId = usersStore.currentUserId;
-      if (userId === null) return 'Nie si prihlásený';
-
-      const channel = this.channels.find((c) => c.id === channelId);
-      if (!channel) return 'Kanál neexistuje';
-      const target = usersStore.userByNickName(nickName);
-      if (!target) return `Používateľ ${nickName} neexistuje`;
-
-      const admin = this.isAdmin(channelId, userId);
-      if (!this.isMember(channelId, userId)) return 'Nie si členom tohto kanála';
-      if (channel.isPrivate && !admin) return 'Do súkromného kanála vie pozývať iba admin';
-      if (this.isMember(channelId, target.id)) return `${target.nickName} už je členom kanála`;
-
-      if (this.isBanned(channelId, target.id)) {
-        if (!admin) return `${target.nickName} má zakázaný prístup, môže ho pozývať iba správca`;
-        this.bans = this.bans.filter((b) => !(b.channelId === channelId && b.userId === target.id));
-      }
-
-      if (this.invitations.some((i) => i.channelId === channelId && i.invitedUserId === target.id))
-        return `${target.nickName} je už pozvaný`;
-
-      const id = Math.max(0, ...this.invitations.map((i) => i.id)) + 1;
-      this.invitations.push({
-        id,
-        channelId,
-        invitedUserId: target.id,
-        invitedById: userId,
-        createdAt: new Date().toISOString(),
-      });
-      return null;
+    // /invite, /revoke, /kick (UC 4) – serverové endpointy pribudnú v A4.
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async inviteUser(channelId: number, nickName: string): Promise<string | null> {
+      void channelId;
+      void nickName;
+      return 'Príkaz /invite zatiaľ nie je napojený na server';
     },
 
-    // /revoke nick (UC 5): spravca sukromneho kanala odoberie clena alebo zrusi pozvanku
-    revokeUser(channelId: number, nickName: string): string | null {
-      const usersStore = useUsersStore();
-      const userId = usersStore.currentUserId;
-      if (userId === null) return 'Nie si prihlásený';
-
-      const channel = this.channels.find((c) => c.id === channelId);
-      if (!channel) return 'Kanál neexistuje';
-      if (!channel.isPrivate) return 'Príkaz /revoke je iba pre súkromné kanály, použi /kick';
-      if (!this.isAdmin(channelId, userId)) return 'Používateľa môže odobrať iba správca';
-
-      const target = usersStore.userByNickName(nickName);
-      if (!target) return `Používateľ ${nickName} neexistuje`;
-      if (target.id === userId) return 'Nemôžeš odobrať sám seba, použi /cancel';
-
-      if (this.isMember(channelId, target.id)) {
-        this.removeMember(channelId, target.id);
-        return null;
-      }
-
-      const invited = this.invitations.some(
-        (i) => i.channelId === channelId && i.invitedUserId === target.id,
-      );
-      if (!invited) return `${target.nickName} nie je členom kanála`;
-
-      this.invitations = this.invitations.filter(
-        (i) => !(i.channelId === channelId && i.invitedUserId === target.id),
-      );
-      return null;
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async revokeUser(channelId: number, nickName: string): Promise<string | null> {
+      void channelId;
+      void nickName;
+      return 'Príkaz /revoke zatiaľ nie je napojený na server';
     },
 
-    // /kick nick (to sa rymuje) (UC 4): spravca vyhodi hned, vo verejnom kanali rozhodne demokracia (hlasy memberov)
-    kickUser(channelId: number, nickName: string): string | null {
-      const usersStore = useUsersStore();
-      const userId = usersStore.currentUserId;
-      if (userId === null) return 'Nie si prihlásený';
-
-      const channel = this.channels.find((c) => c.id === channelId);
-      if (!channel) return 'Kanál neexistuje';
-      if (!this.isMember(channelId, userId)) return 'Nie si členom tohto kanála';
-
-      const target = usersStore.userByNickName(nickName);
-      if (!target) return `Používateľ ${nickName} neexistuje`;
-      if (target.id === userId) return 'Nemôžeš vyhodiť sám seba, použi /cancel';
-      if (!this.isMember(channelId, target.id)) return `${target.nickName} nie je členom kanála`;
-
-      if (this.isAdmin(channelId, userId)) {
-        this.banUser(channelId, target.id);
-        return null;
-      }
-      if (channel.isPrivate) return 'V súkromnom kanály môže vyhadzovať iba správca';
-      if (this.isAdmin(channelId, target.id)) return 'Admina nemožno vyhodiť';
-
-      const votes = this.kickVotes.filter(
-        (v) => v.channelId === channelId && v.targetUserId === target.id,
-      );
-      if (votes.some((v) => v.voterId === userId))
-        return `Za vyhodenie ${target.nickName} si už zahlasoval`;
-
-      this.kickVotes.push({ channelId, targetUserId: target.id, voterId: userId });
-      if (votes.length + 1 >= KICK_VOTES_FOR_BAN) this.banUser(channelId, target.id);
-      return null;
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async kickUser(channelId: number, nickName: string): Promise<string | null> {
+      void channelId;
+      void nickName;
+      return 'Príkaz /kick zatiaľ nie je napojený na server';
     },
 
     // /list (UC 10): otvori pravy panel so zoznamom clenov
     openMembersList(channelId: number): string | null {
-      const userId = useUsersStore().currentUserId;
-      if (userId === null) return 'Nie si prihlásený';
-      if (!this.isMember(channelId, userId)) return 'Nie si členom tohto kanála';
-
+      if (!this.channels.some((c) => c.id === channelId)) return 'Nie si členom tohto kanála';
       this.membersOpen = true;
+      void this.fetchMembers(channelId).catch(() => undefined);
       return null;
     },
   },

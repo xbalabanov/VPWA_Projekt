@@ -1,10 +1,11 @@
 // src/utils/commandHandlers.ts
 // Vykonanie príkazov z CommandLine (UC 4, 5, 10). Parser rozpozná vstup,
-// tu sa zavolajú akcie channel store. Vracia null pri úspechu, inak text chyby.
+// tu sa zavolajú akcie channel store. Pravidlá overuje server.
+// Vracia (async) null pri úspechu, inak text chyby.
 import { useChannelsStore } from '../stores/channels';
 import type { ParsedInput } from './commandParser';
 
-export function executeCommand(parsed: ParsedInput): string | null {
+export async function executeCommand(parsed: ParsedInput): Promise<string | null> {
   if (parsed.error) return parsed.error;
 
   const channelsStore = useChannelsStore();
@@ -28,10 +29,10 @@ export function executeCommand(parsed: ParsedInput): string | null {
     case 'kick':
       return channelsStore.kickUser(channelId, arg);
     case 'cancel':
-      //member odide, ked je member zaroven admin --> kanal sa rusi, (riesi leaveChannel)
+      //member odide, ked je member zaroven admin --> kanal sa rusi (rozhodne server)
       return channelsStore.leaveChannel(channelId);
     case 'quit':
-      //zrusit kanal vie iba admin (kontroluje deleteChannel)
+      //zrusit kanal vie iba admin (server vrati 403 inak)
       return channelsStore.deleteChannel(channelId);
     case 'list':
       return channelsStore.openMembersList(channelId);
