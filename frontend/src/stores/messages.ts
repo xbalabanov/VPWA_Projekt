@@ -127,6 +127,20 @@ export const useMessagesStore = defineStore('messages', {
       }
     },
 
+    //načíta najnovšie správy kanála a zlúči ich podľa ID (žiadne duplikáty)
+    // TODO socket (B2): kým nie je socket, volá ju polling v channels store
+    async loadNewest(channelId: number): Promise<void> {
+      const version = this.sessionVersion;
+      try {
+        const page = await messageService.loadMessages(channelId, null);
+        //medzitým sa user mohol odhlásiť - zahodíme starú odpoveď
+        if (version !== this.sessionVersion) return;
+        this.upsertApiMessages(page.messages);
+      } catch {
+        //výpadok servera: skúsi pri ďalšom obnovení
+      }
+    },
+
     // Vráti text chyby alebo null pri úspechu.
     async sendMessage(channelId: number, content: string): Promise<string | null> {
       const authorId = useUsersStore().currentUserId;
