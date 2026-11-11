@@ -29,7 +29,14 @@
         :rules="[(val) => !!val || 'Zadaj heslo']"
       />
 
-      <q-btn unelevated no-caps class="auth-submit" label="Prihlásiť sa" type="submit" />
+      <q-btn
+        unelevated
+        no-caps
+        class="auth-submit"
+        label="Prihlásiť sa"
+        type="submit"
+        :loading="loading"
+      />
     </q-form>
 
     <p class="auth-switch">Nemáš účet? <router-link to="/register">Zaregistruj sa</router-link></p>
@@ -48,14 +55,17 @@ export default defineComponent({
     return {
       email: '',
       password: '',
+      loading: false, // pocas cakania na server je tlacidlo zablokovane (ziadne dvojklik odoslanie)
     };
   },
 
   methods: {
-    onSubmit() {
-      const ok = useUsersStore().login(this.email, this.password);
-      if (!ok) {
-        this.$q.notify({ message: 'Nesprávny email alebo heslo', color: 'negative' });
+    async onSubmit() {
+      this.loading = true;
+      const error = await useUsersStore().login(this.email, this.password);
+      this.loading = false;
+      if (error) {
+        this.$q.notify({ message: error, color: 'negative' });
         return;
       }
       this.$q.notify({ message: 'Prihlásený', color: 'positive' });

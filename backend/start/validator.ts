@@ -12,7 +12,7 @@
 */
 
 import { DateTime } from 'luxon'
-import { VineDate } from '@vinejs/vine'
+import vine, { SimpleMessagesProvider, VineDate } from '@vinejs/vine'
 
 declare module '@vinejs/vine/types' {
   interface VineGlobalTransforms {
@@ -21,3 +21,17 @@ declare module '@vinejs/vine/types' {
 }
 
 VineDate.transform((value) => DateTime.fromJSDate(value))
+
+// Slovenské chybové hlášky validácie. Frontend zobrazí prvú z nich.
+// https://vinejs.dev/docs/custom_error_messages
+vine.messagesProvider = new SimpleMessagesProvider({
+  'required': 'Pole {{ field }} je povinné',
+  'minLength': 'Pole {{ field }} musí mať aspoň {{ min }} znakov',
+  'maxLength': 'Pole {{ field }} môže mať najviac {{ max }} znakov',
+  'email': 'Zadaj platný email',
+  'nickName.regex': 'Nick môže obsahovať iba písmená, čísla, _ . - (nesmie končiť . ani -)',
+  'nickName.database.unique': 'Tento nick je už obsadený',
+  'email.database.unique': 'Email je už použitý',
+  'passwordConfirmation.sameAs': 'Heslá sa nezhodujú',
+  'password.minLength': 'Heslo musí mať aspoň {{ min }} znakov',
+})

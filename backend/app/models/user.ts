@@ -6,15 +6,13 @@ import { compose } from '@adonisjs/core/helpers'
 import { hasMany, manyToMany } from '@adonisjs/lucid/orm'
 import type { HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
-import { type AccessToken, DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
 
+// withAuthFinder pridá hashovanie hesla pri uložení a User.verifyCredentials(email, heslo).
+// https://docs.adonisjs.com/guides/authentication/verifying-user-credentials
 export default class User extends compose(
   UserSchema,
-  withAuthFinder(() => hash.use())
+  withAuthFinder(() => hash.use(), { uids: ['email'], passwordColumnName: 'password' })
 ) {
-  static accessTokens = DbAccessTokensProvider.forModel(User)
-  declare currentAccessToken?: AccessToken
-
   // Kanály, v ktorých je používateľ členom (opačná strana Channel.members).
   // https://lucid.adonisjs.com/docs/many-to-many
   @manyToMany(() => Channel, {

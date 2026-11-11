@@ -39,7 +39,6 @@
           (val) => !!val || 'Zadaj nick',
           // bez medzier a @, aby neskôr fungovalo @nickname aj /invite nickName
           (val) => isValidNickName(val) || 'Iba pismena, cisla, _ . - (nesmie koncit . ani -)',
-          (val) => !usersStore.isNickNameTaken(val) || 'Tento nick je už obsadený',
         ]"
       />
 
@@ -53,7 +52,6 @@
         :rules="[
           (val) => !!val || 'Zadaj email',
           (val) => val.includes('@') || 'Email musí obsahovať @',
-          (val) => !usersStore.isEmailTaken(val) || 'Email je už použitý',
         ]"
       />
 
@@ -77,7 +75,14 @@
         :rules="[(val) => val === password || 'Heslá sa nezhodujú']"
       />
 
-      <q-btn unelevated no-caps class="auth-submit" label="Vytvoriť účet" type="submit" />
+      <q-btn
+        unelevated
+        no-caps
+        class="auth-submit"
+        label="Vytvoriť účet"
+        type="submit"
+        :loading="loading"
+      />
     </q-form>
 
     <p class="auth-switch">Už máš účet? <router-link to="/login">Prihlás sa</router-link></p>
@@ -107,6 +112,7 @@ export default defineComponent({
       email: '',
       password: '',
       passwordAgain: '',
+      loading: false,
     };
   },
 
@@ -116,15 +122,18 @@ export default defineComponent({
       return NICK_NAME_PATTERN.test(val);
     },
 
-    onSubmit() {
-      // passwordAgain do store neposielame, slúži iba na kontrolu vo formulári
-      const error = this.usersStore.register({
+    async onSubmit() {
+      // Server overí všetko znova (aj obsadený nick/email) a pošle slovenskú hlášku.
+      this.loading = true;
+      const error = await this.usersStore.register({
         firstName: this.firstName.trim(),
         lastName: this.lastName.trim(),
         nickName: this.nickName,
         email: this.email,
         password: this.password,
+        passwordConfirmation: this.passwordAgain,
       });
+      this.loading = false;
 
       if (error) {
         this.$q.notify({ message: error, color: 'negative' });

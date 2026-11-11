@@ -27,6 +27,8 @@ cp .env.example .env
 
 V PowerShelli použi `Copy-Item .env.example .env`. Kopírovanie je len pre prvé nastavenie; existujúci `.env` si zachovaj.
 
+Session je uložená v databáze (`SESSION_DRIVER=database`, tabuľka `sessions`), aby po odhlásení nefungovala ani skopírovaná stará cookie. Ak máš starší `.env` s `SESSION_DRIVER=cookie`, zmeň ho na `database`.
+
 V `.env` uprav `DB_USER` na svojho PostgreSQL používateľa a podľa potreby `DB_PASSWORD`, `DB_HOST` a `DB_PORT`. Predvolený názov databázy je `vpwa_chat`. Lokálny Postgres.app môže fungovať bez hesla; vtedy ostane `DB_PASSWORD=` prázdne.
 
 Databázu vytvor pod týmto používateľom cez pgAdmin alebo napríklad príkazom nižšie. `your_user` nahraď svojím používateľom; ak databáza už existuje, tento krok vynechaj.
