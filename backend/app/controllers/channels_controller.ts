@@ -1,6 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import { Exception } from '@adonisjs/core/exceptions'
 import ChannelAccessService from '#services/channel_access_service'
+import ChannelExpirationService from '#services/channel_expiration_service'
 import ChannelMembershipService from '#services/channel_membership_service'
 import ChannelTransformer from '#transformers/channel_transformer'
 import MemberTransformer from '#transformers/member_transformer'
@@ -17,7 +18,13 @@ export default class ChannelsController {
   async index({ auth, serialize }: HttpContext) {
     const user = auth.getUserOrFail()
     const channels = await user.related('channels').query().orderBy('name')
-    return serialize(ChannelTransformer.transform(channels))
+
+    // Expirované kanály (A5) pri načítaní zoznamu zmažeme a nevrátime.
+    const active = []
+    for (const channel of channels) {
+      if (!(await ChannelExpirationService.deleteIfExpired(channel))) active.push(channel)
+    }
+    return serialize(ChannelTransformer.transform(active))
   }
 
   /**
@@ -42,7 +49,10 @@ export default class ChannelsController {
     const user = auth.getUserOrFail()
     const { name, isPrivate } = await request.validateUsing(joinChannelValidator)
 
-    const existing = await ChannelMembershipService.findByName(name)
+    let existing = await ChannelMembershipService.findByName(name)
+    // Expirovaný kanál (A5) zmažeme – názov je voľný a vznikne nový, bez starej histórie.
+    if (existing && (await ChannelExpirationService.deleteIfExpired(existing))) existing = null
+
     if (!existing) {
       const created = await ChannelMembershipService.createChannel(
         name,

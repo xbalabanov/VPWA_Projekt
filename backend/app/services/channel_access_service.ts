@@ -1,6 +1,7 @@
 import Channel from '#models/channel'
 import ChannelMember from '#models/channel_member'
 import Ban from '#models/ban'
+import ChannelExpirationService from '#services/channel_expiration_service'
 import { Exception } from '@adonisjs/core/exceptions'
 
 /**
@@ -14,12 +15,16 @@ import { Exception } from '@adonisjs/core/exceptions'
 export default class ChannelAccessService {
   /**
    * Nájde kanál podľa ID, inak vyhodí 404.
+   * Expirovaný kanál (A5) sa pri tomto prístupe zmaže a tiež vráti 404.
    */
   static async findChannelOrFail(channelId: number): Promise<Channel> {
     // https://lucid.adonisjs.com/docs/crud-operations#read
     const channel = await Channel.find(channelId)
     if (!channel) {
       throw new Exception('Kanál neexistuje', { status: 404 })
+    }
+    if (await ChannelExpirationService.deleteIfExpired(channel)) {
+      throw new Exception('Kanál zanikol, viac ako 30 dní v ňom nebola správa', { status: 404 })
     }
     return channel
   }

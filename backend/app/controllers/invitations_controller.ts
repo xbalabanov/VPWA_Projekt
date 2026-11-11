@@ -2,6 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { Exception } from '@adonisjs/core/exceptions'
 import Invitation from '#models/invitation'
 import ChannelAccessService from '#services/channel_access_service'
+import ChannelExpirationService from '#services/channel_expiration_service'
 import ChannelMembershipService from '#services/channel_membership_service'
 import ChannelTransformer from '#transformers/channel_transformer'
 import InvitationTransformer from '#transformers/invitation_transformer'
@@ -32,6 +33,10 @@ export default class InvitationsController {
     const invitation = await this.findMyInvitation(Number(params.id), user.id)
 
     await invitation.load('channel')
+    // Expirovaný kanál (A5) zanikne aj s pozvánkou (CASCADE).
+    if (await ChannelExpirationService.deleteIfExpired(invitation.channel)) {
+      throw new Exception('Kanál zanikol, viac ako 30 dní v ňom nebola správa', { status: 404 })
+    }
     if (await ChannelAccessService.isBanned(invitation.channelId, user.id)) {
       await invitation.delete()
       throw new Exception('Máš zakázaný prístup do tohto kanála', { status: 403 })
