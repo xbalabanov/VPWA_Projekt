@@ -1,6 +1,6 @@
 import type Channel from '#models/channel'
-import { Exception } from '@adonisjs/core/exceptions'
 import { DateTime } from 'luxon'
+import ChannelMembershipService from '#services/channel_membership_service'
 
 // Kanál bez novej správy dlhšie ako 30 dní zaniká (UC2).
 export const EXPIRATION_DAYS = 30
@@ -22,18 +22,20 @@ export default class ChannelExpirationService {
    * `now` je parameter, aby sa dala hranica otestovať bez čakania 30 dní.
    */
   static isExpired(channel: Channel, now: DateTime = DateTime.now()): boolean {
-    // TODO Stanislav
-    void channel
-    void now
-    throw new Exception('TODO Stanislav: isExpired', { status: 501 })
+    //Hranica = presne 30 dní pred teraz. Expirovaný je kanál,
+    // kt. aktivita je staršia = menšia, ako táto hranica (presne 30 dní ešte nn)
+    const limit = now.minus({ days: EXPIRATION_DAYS })
+    return channel.lastActivityAt < limit
   }
 
   /**
    * Ak je kanál expirovaný, zmaže ho (aj s históriou) a vráti true. Inak vráti false.
    */
   static async deleteIfExpired(channel: Channel): Promise<boolean> {
-    // TODO Stanislav
-    void channel
-    throw new Exception('TODO Stanislav: deleteIfExpired', { status: 501 })
+    if (!this.isExpired(channel)) return false
+
+    //Zmazanie kanála zmaže cez ON DELETE CASCADE aj členov, pozvánky, hlasy, bany a správy
+    await ChannelMembershipService.deleteChannel(channel)
+    return true
   }
 }
