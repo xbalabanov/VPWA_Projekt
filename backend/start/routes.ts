@@ -52,6 +52,17 @@ router
           .get('channels/:id/members', [controllers.Channels, 'members'])
           .where('id', router.matchers.number())
 
+        // /invite, /revoke, /kick (UC4)
+        router
+          .post('channels/:id/invitations', [controllers.Moderation, 'invite'])
+          .where('id', router.matchers.number())
+        router
+          .post('channels/:id/revoke', [controllers.Moderation, 'revoke'])
+          .where('id', router.matchers.number())
+        router
+          .post('channels/:id/kick', [controllers.Moderation, 'kick'])
+          .where('id', router.matchers.number())
+
         router.get('invitations', [controllers.Invitations, 'index'])
         router
           .post('invitations/:id/accept', [controllers.Invitations, 'accept'])

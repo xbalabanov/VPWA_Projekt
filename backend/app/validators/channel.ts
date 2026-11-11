@@ -24,6 +24,13 @@ export const joinChannelValidator = vine.create({
 })
 
 /**
+ * /invite, /revoke, /kick nick – cieľový používateľ.
+ */
+export const targetUserValidator = vine.create({
+  nickName: vine.string().trim().minLength(1).maxLength(30),
+})
+
+/**
  * GET /users/search?nick=… – začiatok nicku pre dopĺňanie.
  */
 export const userSearchValidator = vine.create({
