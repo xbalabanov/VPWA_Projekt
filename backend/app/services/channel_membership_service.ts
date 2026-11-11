@@ -3,6 +3,7 @@ import ChannelMember from '#models/channel_member'
 import Invitation from '#models/invitation'
 import KickVote from '#models/kick_vote'
 import { DateTime } from 'luxon'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 
 /**
  * Zmeny členstva v kanáli, ktoré používajú controllery kanálov a pozvánok (A3)
@@ -48,10 +49,19 @@ export default class ChannelMembershipService {
   /**
    * Odoberie člena (odchod, /revoke, /kick). Jeho hlasy v kanáli a hlasy proti nemu
    * už neplatia, preto ich zmažeme.
+   * trx: ak voláme z transakcie (ban pri /kick), dotazy musia ísť cez ňu.
+   * https://lucid.adonisjs.com/docs/transactions#using-transactions-with-models
    */
-  static async removeMember(channelId: number, userId: number): Promise<void> {
-    await ChannelMember.query().where('channel_id', channelId).where('user_id', userId).delete()
-    await KickVote.query()
+  static async removeMember(
+    channelId: number,
+    userId: number,
+    trx?: TransactionClientContract
+  ): Promise<void> {
+    await ChannelMember.query({ client: trx })
+      .where('channel_id', channelId)
+      .where('user_id', userId)
+      .delete()
+    await KickVote.query({ client: trx })
       .where('channel_id', channelId)
       .where((query) => {
         query.where('voter_id', userId).orWhere('target_user_id', userId)
