@@ -3,9 +3,9 @@
 // Prihlasenie drzi server v session (HttpOnly cookie), store si pamata iba profil.
 import { defineStore } from 'pinia';
 import type { Member, User, UserStatus } from '../types/models';
-import { ApiError, apiRequest, jsonBody } from '../services/api';
-import { useChannelsStore } from './channels';
-import { useMessagesStore } from './messages';
+import { ApiError, apiRequest, jsonBody } from '../services/api.ts';
+import { useChannelsStore } from './channels.ts';
+import { useMessagesStore } from './messages.ts';
 
 interface UsersState {
   // Používatelia, ktorých poznáme (ja + členovia kanálov). Nie je to zoznam všetkých z DB.
@@ -123,7 +123,7 @@ export const useUsersStore = defineStore('users', {
       this.currentUserId = null;
       useChannelsStore().stopSync();
       useChannelsStore().$reset();
-      useMessagesStore().$reset();
+      useMessagesStore().clearSession();
     },
 
     // Zmena stavu prihláseného používateľa (UC 9). Ostatní ho uvidia v zozname členov.

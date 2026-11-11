@@ -14,6 +14,12 @@
       <q-spinner size="32px" />
     </div>
 
+    <div v-else-if="loadError && !channelMessages.length" class="empty-state" role="alert">
+      <q-icon name="error_outline" size="40px" />
+      <div class="load-error-text">{{ loadError }}</div>
+      <q-btn flat no-caps color="primary" icon="refresh" label="Skúsiť znova" @click="retryLoad" />
+    </div>
+
     <div v-else-if="!channelMessages.length" class="empty-state">
       <q-icon :name="channelsStore.activeChannel.isPrivate ? 'lock' : 'tag'" size="40px" />
       <div class="empty-title">Zatiaľ žiadne správy</div>
@@ -23,6 +29,19 @@
       <li v-if="isLoading" class="history-status">
         <q-spinner size="24px" />
       </li>
+
+      <li v-else-if="loadError" class="history-error" role="alert">
+        <div class="load-error-text">{{ loadError }}</div>
+        <q-btn
+          flat
+          no-caps
+          color="primary"
+          icon="refresh"
+          label="Skúsiť znova"
+          @click="retryLoad"
+        />
+      </li>
+
       <!-- Začiatok histórie: úvod kanála, ako keď otvoríš nový kanál v Slacku. -->
       <li v-else-if="!hasMore" class="channel-intro">
         <div class="channel-intro-icon">
@@ -112,11 +131,20 @@ export default defineComponent({
     lastMessageId(): number | null {
       return this.channelMessages[this.channelMessages.length - 1]?.id ?? null;
     },
+
+    loadError(): string | null {
+      const channelId = this.channelsStore.activeChannelId;
+      return channelId === null ? null : this.messagesStore.loadErrorFor(channelId);
+    },
   },
 
   watch: {
     // Prepnutie kanála → načítaj ho (void = na Promise zámerne nečakáme).
     'channelsStore.activeChannelId'() {
+      void this.openChannel();
+    },
+
+    'messagesStore.sessionVersion'() {
       void this.openChannel();
     },
 
@@ -138,36 +166,69 @@ export default defineComponent({
   },
 
   methods: {
-    // Pri otvorení kanála: ak z neho ešte nič nemáme, načítaj prvú stránku.
-    // Potom zobraz najnovšie správy (dole), ako v každom chate.
     async openChannel(): Promise<void> {
       const channelId = this.channelsStore.activeChannelId;
       if (channelId === null) return;
 
+      const version = this.messagesStore.sessionVersion;
+      const userId = this.usersStore.currentUserId;
+
       if (this.messagesStore.messagesByChannel(channelId).length === 0) {
         await this.messagesStore.loadOlder(channelId);
       }
+
+      if (
+        channelId !== this.channelsStore.activeChannelId ||
+        version !== this.messagesStore.sessionVersion ||
+        userId !== this.usersStore.currentUserId ||
+        this.loadError
+      ) {
+        return;
+      }
+
       this.scrollToBottom();
     },
 
-    // Keď je používateľ blízko vrchu, dočítame staršie správy.
-    onScroll(): void {
-      const scroller = this.$refs.scroller as HTMLElement;
-      if (scroller.scrollTop < 100) void this.loadOlderKeepingPosition();
+    async retryLoad(): Promise<void> {
+      if (this.channelMessages.length === 0) {
+        await this.openChannel();
+      } else {
+        await this.loadOlderKeepingPosition();
+      }
     },
 
-    // Načíta staršiu stránku a posunie scroll tak, aby obsah na obrazovke neposkočil.
+    onScroll(): void {
+      if (this.isLoading || this.loadError || !this.hasMore) return;
+
+      const scroller = this.$refs.scroller as HTMLElement | undefined;
+
+      if (scroller && scroller.scrollTop < 100) {
+        void this.loadOlderKeepingPosition();
+      }
+    },
+
     async loadOlderKeepingPosition(): Promise<void> {
       const channelId = this.channelsStore.activeChannelId;
-      if (channelId === null) return;
+      if (channelId === null || this.isLoading || !this.hasMore) return;
 
-      const scroller = this.$refs.scroller as HTMLElement;
-      // Prehliadač drží posun od vrchu; keď pribudnú správy hore, posunieme scroll presne
-      // o pribudnutú výšku, inak by používateľ "skočil" o stránku dozadu.
+      const scroller = this.$refs.scroller as HTMLElement | undefined;
+      if (!scroller) return;
+
+      const version = this.messagesStore.sessionVersion;
+      const userId = this.usersStore.currentUserId;
       const heightBefore = scroller.scrollHeight;
 
       await this.messagesStore.loadOlder(channelId);
-      await this.$nextTick(); // počkáme, kým Vue vykreslí nové správy
+      await this.$nextTick();
+
+      if (
+        channelId !== this.channelsStore.activeChannelId ||
+        version !== this.messagesStore.sessionVersion ||
+        userId !== this.usersStore.currentUserId ||
+        this.$refs.scroller !== scroller
+      ) {
+        return;
+      }
 
       scroller.scrollTop += scroller.scrollHeight - heightBefore;
     },
@@ -319,5 +380,19 @@ export default defineComponent({
   .message-list {
     padding: 12px 8px 8px;
   }
+}
+
+.history-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.load-error-text {
+  max-width: 420px;
+  color: var(--danger);
+  overflow-wrap: anywhere;
 }
 </style>
