@@ -182,8 +182,8 @@ export default defineComponent({
       if (this.$q.screen.lt.md) this.leftDrawerOpen = false;
     },
 
-    logout(): void {
-      this.usersStore.logout();
+    async logout(): Promise<void> {
+      await this.usersStore.logout();
       void this.$router.push('/login');
     },
   },

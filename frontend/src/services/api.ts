@@ -42,6 +42,23 @@ function isApiResponse(value: unknown): value is ApiResponse<unknown> {
   return isObject(value) && 'data' in value;
 }
 
+// Čo spraviť, keď server povie 401 (session vypršala alebo bola zrušená).
+// Nastavuje ho router (vymaže lokálne dáta a presmeruje na login).
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: () => void): void {
+  onUnauthorized = handler;
+}
+
+// Pomocník pre požiadavky s JSON telom, napr. apiRequest('/auth/login', jsonBody('POST', {...})).
+export function jsonBody(method: string, body: unknown): RequestInit {
+  return {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  };
+}
+
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
@@ -55,6 +72,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   const payload: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {
+    if (response.status === 401) onUnauthorized?.();
     throw new ApiError(getErrorMessage(payload), response.status, payload);
   }
 

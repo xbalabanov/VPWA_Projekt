@@ -18,8 +18,7 @@ export interface User {
   email: string; // unique
   status: UserStatus;
   notifyMentionsOnly: boolean;
-
-  password: string;
+  // Heslo frontend nikdy nemá, overuje ho iba server.
 }
 
 export interface Channel {
