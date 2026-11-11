@@ -43,7 +43,6 @@ test('opätovné doručenie aktualizuje správu a jej adresátov', () => {
 
 test('používa kurzor servera a skončí po poslednej stránke', async (t) => {
   const store = useMessagesStore();
-  store.setSource('api');
 
   const fetchMock = t.mock.method(globalThis, 'fetch', async (input) => {
     const beforeId = new URL(String(input)).searchParams.get('beforeId');
@@ -85,7 +84,6 @@ test('používa kurzor servera a skončí po poslednej stránke', async (t) => {
 
 test('chyba ponechá históriu aj kurzor a dovolí opakovanie', async (t) => {
   const store = useMessagesStore();
-  store.setSource('api');
   let attempt = 0;
 
   t.mock.method(globalThis, 'fetch', async () => {
@@ -124,9 +122,8 @@ test('chyba ponechá históriu aj kurzor a dovolí opakovanie', async (t) => {
   assert.equal(store.loadErrorFor(1), null);
 });
 
-test('nezdvojí požiadavku a ignoruje odpoveď starého zdroja', async (t) => {
+test('nezdvojí požiadavku a po odhlásení ignoruje starú odpoveď', async (t) => {
   const store = useMessagesStore();
-  store.setSource('api');
 
   const { promise, resolve } = Promise.withResolvers();
   const fetchMock = t.mock.method(globalThis, 'fetch', () => promise);
@@ -137,7 +134,8 @@ test('nezdvojí požiadavku a ignoruje odpoveď starého zdroja', async (t) => {
   assert.equal(fetchMock.mock.callCount(), 1);
   assert.equal(store.loading[1], true);
 
-  store.setSource('mock');
+  useUsersStore().clearLocalData();
+  useUsersStore().currentUserId = 1;
 
   resolve(
     Response.json({
@@ -151,7 +149,7 @@ test('nezdvojí požiadavku a ignoruje odpoveď starého zdroja', async (t) => {
 
   await pending;
 
-  assert.equal(store.source, 'mock');
+  assert.equal(store.sessionVersion, 1);
   assert.deepEqual(store.messages, []);
   assert.deepEqual(store.mentions, []);
   assert.deepEqual(store.loading, {});
@@ -159,7 +157,6 @@ test('nezdvojí požiadavku a ignoruje odpoveď starého zdroja', async (t) => {
 
 test('ignoruje odpoveď určenú predchádzajúcemu používateľovi', async (t) => {
   const store = useMessagesStore();
-  store.setSource('api');
 
   const { promise, resolve } = Promise.withResolvers();
   t.mock.method(globalThis, 'fetch', () => promise);
@@ -187,7 +184,6 @@ test('ignoruje odpoveď určenú predchádzajúcemu používateľovi', async (t)
 
 test('odoslanie použije odpoveď servera a pri chybe zachová správy', async (t) => {
   const store = useMessagesStore();
-  store.setSource('api');
   let attempt = 0;
 
   t.mock.method(globalThis, 'fetch', async (_input, options) => {

@@ -5,8 +5,8 @@
 // Akcie vracaju null pri uspechu, inak text chyby, ktory UI ukaze userovi
 import { defineStore } from 'pinia';
 import type { Channel, ChannelMember, Invitation, Member } from '../types/models';
-import { ApiError, apiRequest, jsonBody } from '../services/api';
-import { useUsersStore } from './users';
+import { ApiError, apiRequest, jsonBody } from '../services/api.ts';
+import { useUsersStore } from './users.ts';
 
 interface ChannelsState {
   channels: Channel[]; // iba kanaly, v ktorych som clenom

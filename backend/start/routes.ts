@@ -48,11 +48,21 @@ router
         router
           .delete('channels/:id/membership', [controllers.Channels, 'leave'])
           .where('id', router.matchers.number())
+
+        router
+          .post('channels/:id/messages', [controllers.Messages, 'store'])
+          .where('id', router.matchers.number())
+
+        router
+          .get('channels/:id/messages', [controllers.Messages, 'index'])
+          .where('id', router.matchers.number())
+
         router
           .get('channels/:id/members', [controllers.Channels, 'members'])
           .where('id', router.matchers.number())
 
         router.get('invitations', [controllers.Invitations, 'index'])
+
         router
           .post('invitations/:id/accept', [controllers.Invitations, 'accept'])
           .where('id', router.matchers.number())

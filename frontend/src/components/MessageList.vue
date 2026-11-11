@@ -144,7 +144,7 @@ export default defineComponent({
       void this.openChannel();
     },
 
-    'messagesStore.sourceVersion'() {
+    'messagesStore.sessionVersion'() {
       void this.openChannel();
     },
 
@@ -170,7 +170,7 @@ export default defineComponent({
       const channelId = this.channelsStore.activeChannelId;
       if (channelId === null) return;
 
-      const version = this.messagesStore.sourceVersion;
+      const version = this.messagesStore.sessionVersion;
       const userId = this.usersStore.currentUserId;
 
       if (this.messagesStore.messagesByChannel(channelId).length === 0) {
@@ -179,7 +179,7 @@ export default defineComponent({
 
       if (
         channelId !== this.channelsStore.activeChannelId ||
-        version !== this.messagesStore.sourceVersion ||
+        version !== this.messagesStore.sessionVersion ||
         userId !== this.usersStore.currentUserId ||
         this.loadError
       ) {
@@ -214,7 +214,7 @@ export default defineComponent({
       const scroller = this.$refs.scroller as HTMLElement | undefined;
       if (!scroller) return;
 
-      const version = this.messagesStore.sourceVersion;
+      const version = this.messagesStore.sessionVersion;
       const userId = this.usersStore.currentUserId;
       const heightBefore = scroller.scrollHeight;
 
@@ -223,7 +223,7 @@ export default defineComponent({
 
       if (
         channelId !== this.channelsStore.activeChannelId ||
-        version !== this.messagesStore.sourceVersion ||
+        version !== this.messagesStore.sessionVersion ||
         userId !== this.usersStore.currentUserId ||
         this.$refs.scroller !== scroller
       ) {
