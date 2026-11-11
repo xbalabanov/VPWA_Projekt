@@ -1,6 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Message from '#models/message'
 import ChannelAccessService from '#services/channel_access_service'
+import ChannelExpirationService from '#services/channel_expiration_service'
 import MessageTransformer from '#transformers/message_transformer'
 import { listMessagesValidator, sendMessageValidator } from '#validators/message'
 import { Exception } from '@adonisjs/core/exceptions'
@@ -49,6 +50,14 @@ export default class MessagesController {
         .forUpdate()
         .firstOrFail()
 
+      // Kanál mohol medzičasom expirovať (A5). Pod zámkom ho zmažeme a správu neuložíme,
+      // aby nová správa neoživila zaniknutý kanál. Výnimku vyhodíme až po commite,
+      // inak by rollback vrátil späť aj zmazanie.
+      if (ChannelExpirationService.isExpired(channel)) {
+        await channel.delete()
+        return null
+      }
+
       // Členstvo sa mohlo zmeniť od prvej kontroly. Zámok ho podrží do commitu.
       const membership = await ChannelMember.query({ client: trx })
         .where('channel_id', channel.id)
@@ -83,6 +92,10 @@ export default class MessagesController {
 
       return saved
     })
+
+    if (!message) {
+      throw new Exception('Kanál zanikol, viac ako 30 dní v ňom nebola správa', { status: 404 })
+    }
 
     response.status(201)
     return serialize(MessageTransformer.transform(message))
