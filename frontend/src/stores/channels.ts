@@ -236,26 +236,37 @@ export const useChannelsStore = defineStore('channels', {
       }
     },
 
-    // /invite, /revoke, /kick (UC 4) – serverové endpointy pribudnú v A4.
-    // eslint-disable-next-line @typescript-eslint/require-await
+    // /invite nick (UC 4): kto smie pozvat (a ci sa tym rusi ban) rozhodne server
     async inviteUser(channelId: number, nickName: string): Promise<string | null> {
-      void channelId;
-      void nickName;
-      return 'Príkaz /invite zatiaľ nie je napojený na server';
+      try {
+        await apiRequest(`/channels/${channelId}/invitations`, jsonBody('POST', { nickName }));
+        return null;
+      } catch (error) {
+        return errorText(error);
+      }
     },
 
-    // eslint-disable-next-line @typescript-eslint/require-await
+    // /revoke nick (UC 4): spravca sukromneho kanala odoberie clena alebo zrusi pozvanku
     async revokeUser(channelId: number, nickName: string): Promise<string | null> {
-      void channelId;
-      void nickName;
-      return 'Príkaz /revoke zatiaľ nie je napojený na server';
+      try {
+        await apiRequest(`/channels/${channelId}/revoke`, jsonBody('POST', { nickName }));
+        await this.fetchMembers(channelId);
+        return null;
+      } catch (error) {
+        return errorText(error);
+      }
     },
 
-    // eslint-disable-next-line @typescript-eslint/require-await
+    // /kick nick (UC 4): spravca vyhodi hned, vo verejnom kanali 3 rozne hlasy clenov = ban.
+    // Pocitanie hlasov a ban robi server v transakcii.
     async kickUser(channelId: number, nickName: string): Promise<string | null> {
-      void channelId;
-      void nickName;
-      return 'Príkaz /kick zatiaľ nie je napojený na server';
+      try {
+        await apiRequest(`/channels/${channelId}/kick`, jsonBody('POST', { nickName }));
+        await this.fetchMembers(channelId);
+        return null;
+      } catch (error) {
+        return errorText(error);
+      }
     },
 
     // /list (UC 10): otvori pravy panel so zoznamom clenov
