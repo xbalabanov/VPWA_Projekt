@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<title>VPWA Chat – dokumentácia kódu</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 48px auto; padding: 0 16px; color: #1f2328; }
+  a { color: #0969da; }
+  li { margin: 6px 0; }
+  code { background: #f6f8fa; padding: 1px 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>VPWA Chat – dokumentácia kódu</h1>
+<p>Vygenerované nástrojom TypeDoc (ekvivalent Javadocu pre TypeScript) z JSDoc komentárov v kóde. Iba na osobné použitie, nie je v Gite.</p>
+<ul>
+  <li><a href="backend/index.html">Backend</a> – modely, služby (<code>ChannelAccessService</code>, <code>ChannelMembershipService</code>, <code>ChannelModerationService</code>, <code>ChannelExpirationService</code>), controllery, validátory, transformery</li>
+  <li><a href="frontend/index.html">Frontend</a> – Pinia stores, <code>api.ts</code>, <code>commandHandlers</code>, typy a router (bez <code>.vue</code> komponentov)</li>
+</ul>
+<p>Vysvetlenia tokov požiadaviek a otázky: <code>notes/vysvetlenia-stanislav.md</code>.</p>
+<p>Pregenerovanie (z <code>backend/</code>, resp. <code>frontend/</code>):</p>
+<pre><code>npx typedoc --entryPointStrategy expand app start/routes.ts --exclude "**/*.spec.ts" --out ../notes/docs/backend --excludeExternals --skipErrorChecking
+npx typedoc --entryPointStrategy expand src/stores src/services src/utils src/types src/router --exclude src/stores/index.ts --out ../notes/docs/frontend --excludeExternals --skipErrorChecking</code></pre>
+</body>
+</html>

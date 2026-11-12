@@ -1,0 +1,127 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>VPWA Chat – backend</title><meta name="description" content="Documentation for VPWA Chat – backend"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="index.html" class="title">VPWA Chat – backend</a>
+<div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
+<ul role="listbox" id="tsd-search-results"></ul>
+<div id="tsd-search-status" aria-live="polite" aria-atomic="true">
+<div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header>
+<div class="container container-main">
+<div class="col-content">
+<div class="tsd-page-title">
+<h1>VPWA Chat – backend</h1></div>
+<div class="tsd-panel tsd-typography"><h1 id="backend-vpwa-chat" class="tsd-anchor-link">Backend VPWA Chat<a href="#backend-vpwa-chat" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
+<p>AdonisJS 7, Lucid, PostgreSQL a <code>@rlanz/socket@0.2.4</code>. Vue frontend je v susednom priečinku <code>frontend/</code>.</p>
+<h2 id="aktuálny-stav" class="tsd-anchor-link">Aktuálny stav<a href="#aktuálny-stav" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Je pripravený základ servera, PostgreSQL pripojenie, migrácie zo starter kitu a konfigurácia socketu so session overovaním. <code>GET /</code> vracia <code>{&quot;hello&quot;:&quot;world&quot;}</code>; overuje iba dostupnosť servera. Neprihlásené otvorenie <code>/socket</code> vracia HTTP 401.</p>
+<p>Registrácia/login/logout zatiaľ obsahujú tokenové controllery zo starter kitu, hoci predvolený guard už je <code>web</code>. Stanislav doplní session controllery a používateľské/kanálové modely. Kanálové sockety, správy a napojenie frontendu ešte nie sú implementované. Účet <code>ed@example.com</code> z prototypu v databáze automaticky nevzniká.</p>
+<h2 id="prvé-spustenie" class="tsd-anchor-link">Prvé spustenie<a href="#prvé-spustenie" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Potrebujeme Node.js 24 alebo novší, npm 11 alebo novší a bežiaci PostgreSQL. Vývoj je aktuálne overený na Node 26.12.0, npm 12.2.2 a PostgreSQL 18.6. Docker nie je potrebný.</p>
+<p>Z koreňa repozitára nainštaluj závislosti:</p>
+<pre><code class="bash"><span class="hl-0">cd</span><span class="hl-1"> </span><span class="hl-2">backend</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">ci</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Vytvor vlastný <code>.env</code> podľa <code>.env.example</code>. Na macOS/Linux:</p>
+<pre><code class="bash"><span class="hl-0">cp</span><span class="hl-1"> </span><span class="hl-2">.env.example</span><span class="hl-1"> </span><span class="hl-2">.env</span>
+</code><button type="button">Copy</button></pre>
+
+<p>V PowerShelli použi <code>Copy-Item .env.example .env</code>. Kopírovanie je len pre prvé nastavenie; existujúci <code>.env</code> si zachovaj.</p>
+<p>Session je uložená v databáze (<code>SESSION_DRIVER=database</code>, tabuľka <code>sessions</code>), aby po odhlásení nefungovala ani skopírovaná stará cookie. Ak máš starší <code>.env</code> s <code>SESSION_DRIVER=cookie</code>, zmeň ho na <code>database</code>.</p>
+<p>V <code>.env</code> uprav <code>DB_USER</code> na svojho PostgreSQL používateľa a podľa potreby <code>DB_PASSWORD</code>, <code>DB_HOST</code> a <code>DB_PORT</code>. Predvolený názov databázy je <code>vpwa_chat</code>. Lokálny Postgres.app môže fungovať bez hesla; vtedy ostane <code>DB_PASSWORD=</code> prázdne.</p>
+<p>Databázu vytvor pod týmto používateľom cez pgAdmin alebo napríklad príkazom nižšie. <code>your_user</code> nahraď svojím používateľom; ak databáza už existuje, tento krok vynechaj.</p>
+<pre><code class="bash"><span class="hl-0">createdb</span><span class="hl-1"> </span><span class="hl-3">-h</span><span class="hl-1"> </span><span class="hl-4">127.0.0.1</span><span class="hl-1"> </span><span class="hl-3">-p</span><span class="hl-1"> </span><span class="hl-4">5432</span><span class="hl-1"> </span><span class="hl-3">-U</span><span class="hl-1"> </span><span class="hl-2">your_user</span><span class="hl-1"> </span><span class="hl-2">vpwa_chat</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Pre prvé nastavenie vygeneruj vlastný aplikačný kľúč a spusti migrácie:</p>
+<pre><code class="bash"><span class="hl-0">node</span><span class="hl-1"> </span><span class="hl-2">ace</span><span class="hl-1"> </span><span class="hl-2">generate:key</span><br/><span class="hl-0">node</span><span class="hl-1"> </span><span class="hl-2">ace</span><span class="hl-1"> </span><span class="hl-2">migration:run</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">dev</span>
+</code><button type="button">Copy</button></pre>
+
+<p><code>generate:key</code> zapíše <code>APP_KEY</code> do lokálneho <code>.env</code>. Pri bežnom spúšťaní ho netreba opakovane generovať. <code>.env</code> nepatrí do Gitu; <code>.env.example</code> obsahuje iba šablónu.</p>
+<p>Server je na <a href="http://localhost:3333">http://localhost:3333</a>. Frontend spusti v druhom termináli cez <code>npm run dev</code> v <code>frontend/</code>.</p>
+<p>Súbory v <code>.adonisjs/</code> sa generujú pri inicializácii cez Ace, napríklad pri <code>node ace migration:run</code> alebo <code>npm run dev</code>. Pred prvou typovou kontrolou na čerstvom checkoute najprv vykonaj postup spustenia vyššie.</p>
+<h2 id="demo-dáta" class="tsd-anchor-link">Demo dáta<a href="#demo-dáta" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Seeder <code>database/seeders/channels_demo_seeder.ts</code> pripraví účty a kanály pre scenár kontroly z <a href="media/faza-2.md">plánu druhej fázy</a>:</p>
+<pre><code class="bash"><span class="hl-0">node</span><span class="hl-1"> </span><span class="hl-2">ace</span><span class="hl-1"> </span><span class="hl-2">db:seed</span><br/><span class="hl-5"># alebo celá databáza načisto:</span><br/><span class="hl-0">node</span><span class="hl-1"> </span><span class="hl-2">ace</span><span class="hl-1"> </span><span class="hl-2">migration:fresh</span><span class="hl-1"> </span><span class="hl-3">--seed</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Heslo všetkých demo účtov je <strong><code>heslo123</code></strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Účet</th>
+<th>Email</th>
+<th>Rola v deme</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ed</td>
+<td><code>ed@example.com</code></td>
+<td>správca <code>general</code>, <code>projekt</code> a <code>stary-kanal</code></td>
+</tr>
+<tr>
+<td>Jana</td>
+<td><code>jana@example.com</code></td>
+<td>hlasujúca členka, správkyňa <code>novinky</code></td>
+</tr>
+<tr>
+<td>Peter</td>
+<td><code>peter@example.com</code></td>
+<td>hlasujúci člen</td>
+</tr>
+<tr>
+<td>Mária</td>
+<td><code>maria@example.com</code></td>
+<td>hlasujúca členka</td>
+</tr>
+<tr>
+<td>Tomáš</td>
+<td><code>tomas@example.com</code></td>
+<td>cieľ hlasovania o vyhodenie v <code>general</code></td>
+</tr>
+<tr>
+<td>Lucia</td>
+<td><code>lucia@example.com</code></td>
+<td>nečlen, má pozvánku do súkromného <code>projekt</code></td>
+</tr>
+</tbody>
+</table>
+<p>Kanály: <code>general</code> (verejný, Ed + Jana, Peter, Mária, Tomáš), <code>projekt</code> (súkromný, Ed + Jana), <code>stary-kanal</code> (posledná aktivita pred 40 dňami, zanikne pri prvom prístupe) a <code>novinky</code> (čerstvý). Opakované spustenie seedera demo kanály vytvorí načisto.</p>
+<h2 id="overenie" class="tsd-anchor-link">Overenie<a href="#overenie" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">lint</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">typecheck</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">build</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Stav migrácií overíš cez <code>node ace migration:status</code>. Pri bežiacom serveri neprihlásené socketové spojenie otestuješ takto:</p>
+<pre><code class="bash"><span class="hl-0">curl</span><span class="hl-1"> </span><span class="hl-3">-i</span><span class="hl-1"> </span><span class="hl-3">--max-time</span><span class="hl-1"> </span><span class="hl-4">5</span><span class="hl-1"> </span><span class="hl-6">\</span><br/><span class="hl-1">  </span><span class="hl-3">-H</span><span class="hl-1"> </span><span class="hl-2">&#39;Connection: Upgrade&#39;</span><span class="hl-1"> </span><span class="hl-6">\</span><br/><span class="hl-1">  </span><span class="hl-3">-H</span><span class="hl-1"> </span><span class="hl-2">&#39;Upgrade: websocket&#39;</span><span class="hl-1"> </span><span class="hl-6">\</span><br/><span class="hl-1">  </span><span class="hl-3">-H</span><span class="hl-1"> </span><span class="hl-2">&#39;Sec-WebSocket-Version: 13&#39;</span><span class="hl-1"> </span><span class="hl-6">\</span><br/><span class="hl-1">  </span><span class="hl-3">-H</span><span class="hl-1"> </span><span class="hl-2">&#39;Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==&#39;</span><span class="hl-1"> </span><span class="hl-6">\</span><br/><span class="hl-1">  </span><span class="hl-3">-H</span><span class="hl-1"> </span><span class="hl-2">&#39;Origin: http://localhost:9000&#39;</span><span class="hl-1"> </span><span class="hl-6">\</span><br/><span class="hl-1">  </span><span class="hl-2">http://localhost:3333/socket</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Očakávame <code>401 Unauthorized</code>. Pozitívny test prihláseného spojenia doplníme po session autentifikácii. Lokálne socket origins povoľujú frontend na porte 9000; pri zmene portu uprav <code>config/socket.ts</code>.</p>
+<h2 id="ďalšia-práca-a-rozhodnutia" class="tsd-anchor-link">Ďalšia práca a rozhodnutia<a href="#ďalšia-práca-a-rozhodnutia" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Rozdelenie úloh a navrhnutý API/socket kontrakt sú v <a href="media/faza-2.md">pláne druhej fázy</a>. Základ ešte potrebuje Stanislavovo review a overenie spustenia na jeho počítači.</p>
+<p>PostgreSQL je zvolená relačná databáza; balíček <code>pg</code> je jej ovládač pre Lucid. <code>@rlanz/socket</code> zabezpečí realtime komunikáciu a je pripnutý na verziu použitú v <a href="https://github.com/kurice/vpwa27/blob/main/prednasky/slek/part1/readme.md#websockety">materiáli predmetu</a>. HTTP aj socket budú používať rovnakú session cookie podľa <a href="https://github.com/kurice/vpwa27/blob/main/prednasky/slek/part2/readme.md">časti o autentifikácii</a>.</p>
+<p>Pred nasadením treba dokončiť session autentifikáciu, oprávnenia kanálov, CSRF ochranu a produkčné origins. Súčasný stav slúži na lokálny vývoj.</p>
+</div></div>
+<div class="col-sidebar">
+<div class="page-menu">
+<div class="tsd-navigation settings">
+<details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>Settings</h3></summary>
+<div class="tsd-accordion-details">
+<div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span>
+<ul id="tsd-filter-options">
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div>
+<div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div>
+<details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>On This Page</h3></summary>
+<div class="tsd-accordion-details"><a href="#backend-vpwa-chat"><span>Backend <wbr/>VPWA <wbr/>Chat</span></a>
+<ul>
+<li><a href="#aktuálny-stav"><span>Aktuálny stav</span></a></li>
+<li><a href="#prvé-spustenie"><span>Prvé spustenie</span></a></li>
+<li><a href="#demo-dáta"><span>Demo dáta</span></a></li>
+<li><a href="#overenie"><span>Overenie</span></a></li>
+<li><a href="#ďalšia-práca-a-rozhodnutia"><span>Ďalšia práca a rozhodnutia</span></a></li></ul></div></details></div>
+<div class="site-menu">
+<nav class="tsd-navigation"><a href="modules.html">VPWA Chat – backend</a>
+<ul class="tsd-small-nested-navigation" id="tsd-nav-container">
+<li>Loading...</li></ul></nav></div></div></div><footer>
+<p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
+<div class="overlay"></div></body></html>
