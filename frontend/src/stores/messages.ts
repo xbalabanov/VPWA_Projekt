@@ -127,8 +127,7 @@ export const useMessagesStore = defineStore('messages', {
       }
     },
 
-    //načíta najnovšie správy kanála a zlúči ich podľa ID (žiadne duplikáty)
-    // TODO socket (B2): kým nie je socket, volá ju polling v channels store
+    // Po potvrdení odberu dočítame najnovšie správy a zlúčime ich podľa ID.
     async loadNewest(channelId: number): Promise<void> {
       const version = this.sessionVersion;
       try {

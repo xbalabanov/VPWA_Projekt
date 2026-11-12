@@ -7,7 +7,6 @@ import { defineStore } from 'pinia';
 import type { Channel, ChannelMember, Invitation, Member } from '../types/models';
 import { ApiError, apiRequest, jsonBody } from '../services/api.ts';
 import { useUsersStore } from './users.ts';
-import { useMessagesStore } from './messages.ts';
 
 interface ChannelsState {
   channels: Channel[]; // iba kanaly, v ktorych som clenom
@@ -17,9 +16,7 @@ interface ChannelsState {
   membersOpen: boolean; //pravy panel so zoznamom clenov (otvori ho aj /list)
 }
 
-// Kým nie je socket (B2), obnovujeme kanály, pozvánky a správy aktívneho kanála
-// každé 3 s a pri návrate do okna.
-// TODO socket (B2): po napojení socketu polling odstrániť a volať on* udalosti nižšie.
+// Kanály, pozvánky a členov obnovujeme každé 3 s a pri návrate do okna.
 const SYNC_INTERVAL_MS = 3000;
 let syncTimer: ReturnType<typeof setInterval> | null = null;
 let onWindowFocus: (() => void) | null = null;
@@ -98,9 +95,6 @@ export const useChannelsStore = defineStore('channels', {
       try {
         await Promise.all([this.fetchChannels(), this.fetchInvitations()]);
         if (this.activeChannelId !== null) await this.fetchMembers(this.activeChannelId);
-        if (this.activeChannelId !== null) {
-          await useMessagesStore().loadNewest(this.activeChannelId);
-        }
       } catch {
         // výpadok servera: necháme posledné dáta, skúsi sa to pri ďalšom obnovení
       }
