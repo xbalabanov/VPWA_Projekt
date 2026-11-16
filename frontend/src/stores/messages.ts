@@ -2,9 +2,11 @@
 import { defineStore } from 'pinia';
 import { Notify } from 'quasar';
 import type { Mention, Message } from '../types/models';
-import type { MessageDto } from '../types/api';
+import type { MessageDto, MessagesPageDto } from '../types/api';
 import { useUsersStore } from './users.ts';
 import messageService from '../services/MessageService.ts';
+
+const historyRequests = new Map<number, Promise<MessagesPageDto>>();
 
 interface MessagesState {
   messages: Message[];
@@ -14,6 +16,7 @@ interface MessagesState {
   drafts: Draft[];
   sessionVersion: number;
   nextBeforeId: Record<number, number | null>;
+  syncedThroughId: Partial<Record<number, number>>;
   loadErrors: Record<number, string | null>;
 }
 
@@ -33,6 +36,7 @@ export const useMessagesStore = defineStore('messages', {
     drafts: [],
     sessionVersion: 0,
     nextBeforeId: {},
+    syncedThroughId: {},
     loadErrors: {},
   }),
 
@@ -90,6 +94,7 @@ export const useMessagesStore = defineStore('messages', {
 
     clearSession(): void {
       const nextVersion = this.sessionVersion + 1;
+      historyRequests.clear();
       this.$reset();
       this.sessionVersion = nextVersion;
     },
@@ -105,14 +110,22 @@ export const useMessagesStore = defineStore('messages', {
       this.loading[channelId] = true;
       this.loadErrors[channelId] = null;
 
+      const request = messageService.loadMessages(channelId, beforeId);
+      historyRequests.set(channelId, request);
+
       try {
-        const page = await messageService.loadMessages(channelId, beforeId);
+        const page = await request;
 
         if (version !== this.sessionVersion || userId !== useUsersStore().currentUserId) {
           return;
         }
 
         this.upsertApiMessages(page.messages);
+
+        if (beforeId === null) {
+          this.syncedThroughId[channelId] ??= page.messages.at(-1)?.id ?? 0;
+        }
+
         this.hasMore[channelId] = page.hasMore;
         this.nextBeforeId[channelId] = page.nextBeforeId;
       } catch (error: unknown) {
@@ -121,22 +134,45 @@ export const useMessagesStore = defineStore('messages', {
             error instanceof Error ? error.message : 'Nepodarilo sa načítať správy.';
         }
       } finally {
+        if (historyRequests.get(channelId) === request) {
+          historyRequests.delete(channelId);
+        }
+
         if (version === this.sessionVersion) {
           this.loading[channelId] = false;
         }
       }
     },
 
-    // Po potvrdení odberu dočítame najnovšie správy a zlúčime ich podľa ID.
-    async loadNewest(channelId: number): Promise<void> {
+    async recoverMissed(channelId: number, isCurrent: () => boolean): Promise<void> {
       const version = this.sessionVersion;
+      const userId = useUsersStore().currentUserId;
+      const canApply = () =>
+        isCurrent() && version === this.sessionVersion && userId === useUsersStore().currentUserId;
+
       try {
-        const page = await messageService.loadMessages(channelId, null);
-        //medzitým sa user mohol odhlásiť - zahodíme starú odpoveď
-        if (version !== this.sessionVersion) return;
-        this.upsertApiMessages(page.messages);
+        if (this.syncedThroughId[channelId] === undefined) {
+          await (historyRequests.get(channelId) ?? this.loadOlder(channelId));
+        }
+
+        let afterId = this.syncedThroughId[channelId];
+        if (afterId === undefined) return;
+
+        while (canApply()) {
+          const page = await messageService.loadNewer(channelId, afterId);
+          if (!canApply()) return;
+
+          const last = page.messages.at(-1);
+          if (!last || last.id <= afterId) return;
+
+          this.upsertApiMessages(page.messages);
+          afterId = last.id;
+          this.syncedThroughId[channelId] = afterId;
+
+          if (!page.hasMore) return;
+        }
       } catch {
-        //výpadok servera: skúsi pri ďalšom obnovení
+        // Ďalšie pripojenie pokračuje od poslednej úspešne načítanej stránky.
       }
     },
 

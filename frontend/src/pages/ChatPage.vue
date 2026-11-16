@@ -32,6 +32,7 @@ export default defineComponent({
         const socket = new Socket({ url: new URL(API_BASE_URL).origin });
         const channel = socket.channel(`channels/${channelId}/${userId}`);
         let active = true;
+        let connectionVersion = 0;
 
         channel.listen<MessageDto>('message.created', (message) => {
           if (active && message.channelId === channelId) {
@@ -40,10 +41,13 @@ export default defineComponent({
         });
 
         const offConnect = socket.on('connect', () => {
+          const version = ++connectionVersion;
+          const isCurrent = () => active && version === connectionVersion;
+
           void channel
             .subscribe()
             .then(async () => {
-              if (active) await messages.loadNewest(channelId);
+              if (isCurrent()) await messages.recoverMissed(channelId, isCurrent);
             })
             .catch(() => undefined);
         });

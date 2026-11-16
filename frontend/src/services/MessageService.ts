@@ -16,6 +16,15 @@ class MessageService {
     return apiRequest<MessagesPageDto>(`/channels/${channelId}/messages?${params.toString()}`);
   }
 
+  loadNewer(channelId: number, afterId: number): Promise<MessagesPageDto> {
+    const params = new URLSearchParams({
+      limit: String(PAGE_SIZE),
+      afterId: String(afterId),
+    });
+
+    return apiRequest<MessagesPageDto>(`/channels/${channelId}/messages?${params.toString()}`);
+  }
+
   sendMessage(channelId: number, content: string): Promise<MessageDto> {
     const payload: SendMessagePayload = {
       content,
