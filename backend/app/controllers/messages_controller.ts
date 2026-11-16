@@ -14,27 +14,40 @@ import socket from '@rlanz/socket/services/main'
 export default class MessagesController {
   async index({ auth, request, serialize }: HttpContext) {
     const user = auth.getUserOrFail()
-    const { params, beforeId, limit = 20 } = await request.validateUsing(listMessagesValidator)
+    const {
+      params,
+      beforeId,
+      afterId,
+      limit = 20,
+    } = await request.validateUsing(listMessagesValidator)
 
     await ChannelAccessService.assertMember(params.id, user.id)
 
+    const loadingNewer = afterId !== undefined
     const query = Message.query()
       .where('channel_id', params.id)
       .preload('mentionedUsers')
-      .orderBy('id', 'desc')
+      .orderBy('id', loadingNewer ? 'asc' : 'desc')
       .limit(limit + 1)
 
     if (beforeId !== undefined) {
       query.where('id', '<', beforeId)
     }
 
+    if (afterId !== undefined) {
+      query.where('id', '>', afterId)
+    }
+
     const rows = await query
     const hasMore = rows.length > limit
-    const messages = rows.slice(0, limit).reverse()
+    const messages = rows.slice(0, limit)
+    if (!loadingNewer) {
+      messages.reverse()
+    }
 
     return serialize({
       messages: MessageTransformer.transform(messages),
-      nextBeforeId: hasMore ? (messages[0]?.id ?? null) : null,
+      nextBeforeId: !loadingNewer && hasMore ? (messages[0]?.id ?? null) : null,
       hasMore,
     })
   }
