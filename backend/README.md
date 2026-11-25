@@ -72,7 +72,7 @@ Heslo všetkých demo účtov je **`heslo123`**.
 | Tomáš | `tomas@example.com` | cieľ hlasovania o vyhodenie v `general` |
 | Lucia | `lucia@example.com` | nečlen, má pozvánku do súkromného `projekt` |
 
-Kanály: `general` (verejný, Ed + Jana, Peter, Mária, Tomáš), `projekt` (súkromný, Ed + Jana), `stary-kanal` (posledná aktivita pred 40 dňami, zanikne pri prvom prístupe) a `novinky` (čerstvý). Opakované spustenie seedera demo kanály vytvorí načisto.
+Kanály: `general` (verejný, Ed + Jana, Peter, Mária, Tomáš), `projekt` (súkromný, Ed + Jana), `stary-kanal` (posledná aktivita pred 40 dňami; zmaže ho pravidelné upratovanie hneď po štarte servera alebo prvý prístup) a `novinky` (čerstvý). Opakované spustenie seedera demo kanály vytvorí načisto.
 
 ## Overenie
 
@@ -95,6 +95,29 @@ curl -i --max-time 5 \
 ```
 
 Očakávame `401 Unauthorized`. Pozitívny test prihláseného spojenia doplníme po session autentifikácii. Lokálne socket origins povoľujú frontend na porte 9000; pri zmene portu uprav `config/socket.ts`.
+
+## Mazanie expirovaných kanálov
+
+Kanál, v ktorom viac ako 30 dní nebola správa, zaniká aj s históriou (UC2). Server ho zmaže pri prístupe (zoznam kanálov, `/join`, vstup do kanála, prijatie pozvánky, odoslanie správy) a navyše **pravidelne, bez požiadavky klienta**:
+
+- Preload `start/channel_cleanup.ts` beží iba v procese HTTP servera (`adonisrc.ts`, `environment: ['web']`), nie v testoch ani v ace príkazoch. Prvé upratovanie spustí hneď po štarte, potom každých `CHANNEL_CLEANUP_INTERVAL_MINUTES` minút (predvolene 60, `0` = vypnuté). Členovia zmazaného kanála dostanú cez socket `channel.deleted` s dôvodom `expired`.
+- Ručne:
+
+  ```bash
+  node ace channels:cleanup
+  ```
+
+  Príkaz beží v samostatnom procese, preto jeho udalosti nedostane žiadny prehliadač; klienti sa zosúladia pri ďalšom obnovení zoznamu kanálov (pripojenie socketu, návrat do okna).
+
+Mazanie aj odoslanie správy zamykajú riadok kanála a expiráciu overia pod zámkom, takže správa poslaná tesne pred zánikom kanála sa nestratí (`tests/functional/concurrency.spec.ts`).
+
+## Testy
+
+```bash
+npm test
+```
+
+Testy používajú lokálnu databázu z `.env`. Funkčné testy bežia na porte `3334` (`.env.test`), takže môžu bežať aj pri spustenom dev serveri. Väčšina testov beží v globálnej transakcii, ktorá sa po teste vráti; testy súbežnosti ju použiť nemôžu (zámky by nesúťažili), preto vytvárajú iba záznamy s prefixom `t_a8_` a v teardown ich zmažú.
 
 ## Ďalšia práca a rozhodnutia
 
