@@ -82,11 +82,15 @@ export default class ChannelsController {
     if (existing.isPrivate) {
       throw new Exception('Kanál je súkromný, potrebuješ pozvánku', { status: 403 })
     }
-    if (await ChannelAccessService.isBanned(existing.id, user.id)) {
-      throw new Exception('Máš zakázaný prístup do tohto kanála', { status: 403 })
-    }
 
-    await ChannelMembershipService.addMember(existing, user.id)
+    // Ban overíme a člena pridáme pod zámkom kanála – súbežný /kick sa nestihne
+    // vkliniť medzi kontrolu a vstup (A8).
+    await ChannelAccessService.withChannelLock(existing.id, async (trx) => {
+      if (await ChannelAccessService.isBanned(existing!.id, user.id)) {
+        throw new Exception('Máš zakázaný prístup do tohto kanála', { status: 403 })
+      }
+      await ChannelMembershipService.addMember(existing!, user.id, trx)
+    })
     await ChannelEventsService.publish({
       type: 'joined',
       channel: ChannelEventsService.channelDto(existing),

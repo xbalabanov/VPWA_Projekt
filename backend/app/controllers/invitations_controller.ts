@@ -38,13 +38,17 @@ export default class InvitationsController {
     if (await ChannelExpirationService.deleteIfExpired(invitation.channel)) {
       throw new Exception('Kanál zanikol, viac ako 30 dní v ňom nebola správa', { status: 404 })
     }
-    if (await ChannelAccessService.isBanned(invitation.channelId, user.id)) {
+    // Kontrola banu a vstup pod zámkom kanála – súbežný ban sa nevklinie medzi ne (A8).
+    const banned = await ChannelAccessService.withChannelLock(invitation.channelId, async (trx) => {
+      if (await ChannelAccessService.isBanned(invitation.channelId, user.id)) return true
+      // addMember zmaže aj samotnú pozvánku.
+      await ChannelMembershipService.addMember(invitation.channel, user.id, trx)
+      return false
+    })
+    if (banned) {
       await invitation.delete()
       throw new Exception('Máš zakázaný prístup do tohto kanála', { status: 403 })
     }
-
-    // addMember zmaže aj samotnú pozvánku.
-    await ChannelMembershipService.addMember(invitation.channel, user.id)
     // Mne (aj v iných kartách) pribudne kanál, ostatní členovia obnovia zoznam (A7).
     await ChannelEventsService.publish({
       type: 'joined',

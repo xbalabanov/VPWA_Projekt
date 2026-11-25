@@ -43,6 +43,19 @@ export default class ChannelModerationService {
    *   členom sa stane až po prijatí)
    */
   static async invite(channel: Channel, actorId: number, target: User): Promise<Invitation> {
+    // Pod zámkom kanála: súbežný ban (/kick) sa dokončí skôr, než overíme ban a vytvoríme
+    // pozvánku – zabanovanému tak člen nepošle pozvánku, ktorá by ban obišla (A8).
+    return ChannelAccessService.withChannelLock(channel.id, (trx) =>
+      this.inviteLocked(channel, actorId, target, trx)
+    )
+  }
+
+  private static async inviteLocked(
+    channel: Channel,
+    actorId: number,
+    target: User,
+    trx: TransactionClientContract
+  ): Promise<Invitation> {
     const isAdmin = ChannelAccessService.isAdmin(channel, actorId)
 
     if (channel.isPrivate && !isAdmin) {
@@ -58,10 +71,10 @@ export default class ChannelModerationService {
           status: 403,
         })
       }
-      await this.unban(channel.id, target.id)
+      await this.unban(channel.id, target.id, trx)
     }
 
-    const existing = await Invitation.query()
+    const existing = await Invitation.query({ client: trx })
       .where('channel_id', channel.id)
       .where('invited_user_id', target.id)
       .first()
@@ -70,11 +83,10 @@ export default class ChannelModerationService {
     }
 
     // Udalosť invitation.created pošle controller po zápise (A7).
-    return Invitation.create({
-      channelId: channel.id,
-      invitedUserId: target.id,
-      invitedById: actorId,
-    })
+    return Invitation.create(
+      { channelId: channel.id, invitedUserId: target.id, invitedById: actorId },
+      { client: trx }
+    )
   }
 
   /**
@@ -123,7 +135,10 @@ export default class ChannelModerationService {
     }
 
     if (ChannelAccessService.isAdmin(channel, actorId)) {
-      await this.ban(channel.id, target.id)
+      // Ban v transakcii pod zámkom kanála – súbežný /join ho uvidí celý, nie v polovici (A8).
+      await ChannelAccessService.withChannelLock(channel.id, (trx) =>
+        this.ban(channel.id, target.id, trx)
+      )
       return { banned: true, votes: 0 }
     }
 
@@ -192,7 +207,14 @@ export default class ChannelModerationService {
   /**
    * Zrušenie banu správcom (cez /invite).
    */
-  static async unban(channelId: number, userId: number): Promise<void> {
-    await Ban.query().where('channel_id', channelId).where('user_id', userId).delete()
+  static async unban(
+    channelId: number,
+    userId: number,
+    trx?: TransactionClientContract
+  ): Promise<void> {
+    await Ban.query({ client: trx })
+      .where('channel_id', channelId)
+      .where('user_id', userId)
+      .delete()
   }
 }

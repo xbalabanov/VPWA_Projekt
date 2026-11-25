@@ -38,9 +38,13 @@ export default class ChannelMembershipService {
    * Pridá člena. Jeho pozvánka do kanála už nie je potrebná, zmažeme ju.
    * https://lucid.adonisjs.com/docs/many-to-many#attach
    */
-  static async addMember(channel: Channel, userId: number): Promise<void> {
-    await channel.related('members').attach([userId])
-    await Invitation.query()
+  static async addMember(
+    channel: Channel,
+    userId: number,
+    trx?: TransactionClientContract
+  ): Promise<void> {
+    await channel.related('members').attach([userId], trx)
+    await Invitation.query({ client: trx })
       .where('channel_id', channel.id)
       .where('invited_user_id', userId)
       .delete()
