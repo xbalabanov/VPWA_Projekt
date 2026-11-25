@@ -4,6 +4,7 @@ import Invitation from '#models/invitation'
 import ChannelAccessService from '#services/channel_access_service'
 import ChannelExpirationService from '#services/channel_expiration_service'
 import ChannelMembershipService from '#services/channel_membership_service'
+import ChannelEventsService from '#services/channel_events_service'
 import ChannelTransformer from '#transformers/channel_transformer'
 import InvitationTransformer from '#transformers/invitation_transformer'
 
@@ -44,6 +45,12 @@ export default class InvitationsController {
 
     // addMember zmaže aj samotnú pozvánku.
     await ChannelMembershipService.addMember(invitation.channel, user.id)
+    // Mne (aj v iných kartách) pribudne kanál, ostatní členovia obnovia zoznam (A7).
+    await ChannelEventsService.publish({
+      type: 'joined',
+      channel: ChannelEventsService.channelDto(invitation.channel),
+      userId: user.id,
+    })
     return serialize(ChannelTransformer.transform(invitation.channel))
   }
 
@@ -55,6 +62,13 @@ export default class InvitationsController {
     const invitation = await this.findMyInvitation(Number(params.id), user.id)
 
     await invitation.delete()
+    // Pozvánka zmizne aj v mojich ostatných kartách (A7).
+    await ChannelEventsService.publish({
+      type: 'invitationRemoved',
+      invitationId: invitation.id,
+      channelId: invitation.channelId,
+      userId: user.id,
+    })
     return serialize({ deleted: true })
   }
 

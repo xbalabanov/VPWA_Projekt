@@ -12,6 +12,9 @@ import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 // Koľko rôznych členov musí dať /kick, kým je používateľ vo verejnom kanáli zabanovaný (UC4).
 export const KICK_VOTES_FOR_BAN = 3
 
+// Čo /revoke spravil – podľa toho sa pošle iná udalosť (A7).
+export type RevokeResult = { removed: 'member' } | { removed: 'invitation'; invitationId: number }
+
 export interface KickResult {
   banned: boolean // bol používateľ vyhodený (ban)?
   votes: number // počet platných hlasov proti nemu (pri admin kicku 0)
@@ -39,7 +42,7 @@ export default class ChannelModerationService {
    * - zabanovaného môže pozvať iba správca a tým mu ban zruší (+ dostane pozvánku,
    *   členom sa stane až po prijatí)
    */
-  static async invite(channel: Channel, actorId: number, target: User): Promise<void> {
+  static async invite(channel: Channel, actorId: number, target: User): Promise<Invitation> {
     const isAdmin = ChannelAccessService.isAdmin(channel, actorId)
 
     if (channel.isPrivate && !isAdmin) {
@@ -66,18 +69,18 @@ export default class ChannelModerationService {
       throw new Exception(`${target.nickName} je už pozvaný`, { status: 422 })
     }
 
-    await Invitation.create({
+    // Udalosť invitation.created pošle controller po zápise (A7).
+    return Invitation.create({
       channelId: channel.id,
       invitedUserId: target.id,
       invitedById: actorId,
     })
-    // udalosť pre socket (B2): invitation.created (adresátovi)
   }
 
   /**
    * /revoke nick – iba v súkromnom kanáli a iba správca. Odoberie člena alebo zruší pozvánku.
    */
-  static async revoke(channel: Channel, actorId: number, target: User): Promise<void> {
+  static async revoke(channel: Channel, actorId: number, target: User): Promise<RevokeResult> {
     if (!channel.isPrivate) {
       throw new Exception('Príkaz /revoke je iba pre súkromné kanály, použi /kick', { status: 422 })
     }
@@ -90,17 +93,19 @@ export default class ChannelModerationService {
 
     if (await ChannelAccessService.isMember(channel.id, target.id)) {
       await ChannelMembershipService.removeMember(channel.id, target.id)
-      return
+      return { removed: 'member' }
     }
 
-    const deleted = await Invitation.query()
+    // Pozvánku najprv nájdeme – jej ID potrebuje udalosť invitation.removed (A7).
+    const invitation = await Invitation.query()
       .where('channel_id', channel.id)
       .where('invited_user_id', target.id)
-      .delete()
-    // delete() vráti pole s počtom zmazaných riadkov
-    if (Number(deleted[0]) === 0) {
+      .first()
+    if (!invitation) {
       throw new Exception(`${target.nickName} nie je členom kanála`, { status: 404 })
     }
+    await invitation.delete()
+    return { removed: 'invitation', invitationId: invitation.id }
   }
 
   /**
@@ -148,7 +153,8 @@ export default class ChannelModerationService {
 
     //Zápis banu; firstOrCreate nevytvorí duplikát, ak ban už jestvuje.
     await Ban.firstOrCreate({ channelId, userId }, {}, { client: trx })
-    //udaost pre socket (B2): channel.deleted vyhodenému, membership.changed ostatným
+    // Udalosti (channel.deleted vyhodenému, membership.changed ostatným) posiela controller
+    // až po commite – ban môže bežať vnútri transakcie hlasovania (A7).
   }
 
   /**
