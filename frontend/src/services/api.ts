@@ -1,7 +1,7 @@
 import type { ApiResponse } from '../types/api';
 
 // Zatiaľ adresa lokálneho backendu.
-const API_BASE_URL = 'http://localhost:3333/api/v1';
+export const API_BASE_URL = 'http://localhost:3333/api/v1';
 
 export class ApiError extends Error {
   readonly status: number;

@@ -9,6 +9,7 @@ import db from '@adonisjs/lucid/services/db'
 import Channel from '#models/channel'
 import ChannelMember from '#models/channel_member'
 import { extractMentionedNickNames } from '../utils/mentions.js'
+import socket from '@rlanz/socket/services/main'
 
 export default class MessagesController {
   async index({ auth, request, serialize }: HttpContext) {
@@ -38,7 +39,7 @@ export default class MessagesController {
     })
   }
 
-  async store({ auth, request, response, serialize }: HttpContext) {
+  async store({ auth, request, response, serialize, logger }: HttpContext) {
     const user = auth.getUserOrFail()
     const { params, content } = await request.validateUsing(sendMessageValidator)
     const { id: channelId } = await ChannelAccessService.assertMember(params.id, user.id)
@@ -97,7 +98,19 @@ export default class MessagesController {
       throw new Exception('Kanál zanikol, viac ako 30 dní v ňom nebola správa', { status: 404 })
     }
 
+    const result = await serialize(MessageTransformer.transform(message))
+
+    try {
+      const members = await ChannelMember.query().where('channel_id', channelId).select('user_id')
+
+      for (const member of members) {
+        socket.to(`channels/${channelId}/${member.userId}`).emit('message.created', result.data)
+      }
+    } catch (error) {
+      logger.error({ err: error, messageId: message.id }, 'Nepodarilo sa doručiť správu cez socket')
+    }
+
     response.status(201)
-    return serialize(MessageTransformer.transform(message))
+    return result
   }
 }
