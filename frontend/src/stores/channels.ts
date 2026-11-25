@@ -93,9 +93,16 @@ export const useChannelsStore = defineStore('channels', {
     // ---- nacitanie zo servera ----
 
     async fetchChannels(): Promise<void> {
+      const active = this.activeChannel;
       this.channels = await apiRequest<Channel[]>('/channels');
-      // aktívny kanál mohol zaniknúť alebo ma z neho vyhodili
-      if (!this.channels.some((c) => c.id === this.activeChannelId)) this.selectFirstChannel();
+      // Aktívny kanál mohol zaniknúť alebo ma z neho vyhodili (napr. počas výpadku spojenia,
+      // keď udalosť channel.deleted neprišla) – prepneme a oznámime to.
+      if (!this.channels.some((c) => c.id === this.activeChannelId)) {
+        if (active) {
+          Notify.create({ type: 'warning', message: `Kanál #${active.name} už nie je dostupný` });
+        }
+        this.selectFirstChannel();
+      }
     },
 
     async fetchInvitations(): Promise<void> {
