@@ -1,6 +1,7 @@
 import { BaseChannel, SocketResponseError, type AuthenticatedSocket } from '@rlanz/socket'
 import type User from '#models/user'
 import ChannelAccessService from '#services/channel_access_service'
+import TypingService from '#services/typing_service'
 import { Exception } from '@adonisjs/core/exceptions'
 
 export default class ChannelMessagesChannel extends BaseChannel<User> {
@@ -26,5 +27,14 @@ export default class ChannelMessagesChannel extends BaseChannel<User> {
       }
       throw error
     }
+  }
+
+  /**
+   * Odchod z odberu: prepnutie kanála, odhlásenie alebo zánik spojenia (heartbeat v
+   * config/socket.ts odpojí klienta, ktorý neodpovedá). Jeho draft u ostatných zmizne (B7).
+   */
+  async onLeave(socket: AuthenticatedSocket<User>, channel: string) {
+    const user = socket.getUserOrFail()
+    await TypingService.publish(Number(channel), user.id, '')
   }
 }
