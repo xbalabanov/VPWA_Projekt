@@ -10,6 +10,10 @@ import Channel from '#models/channel'
 import ChannelMember from '#models/channel_member'
 import { extractMentionedNickNames } from '../utils/mentions.js'
 import socket from '@rlanz/socket/services/main'
+import ChannelEventsService, {
+  type Audience,
+  type ChannelDto,
+} from '#services/channel_events_service'
 
 export default class MessagesController {
   async index({ auth, request, serialize }: HttpContext) {
@@ -58,6 +62,10 @@ export default class MessagesController {
     const { id: channelId } = await ChannelAccessService.assertMember(params.id, user.id)
     const nickNames = extractMentionedNickNames(content)
 
+    // Zaniknutý kanál (A7): publikum zistíme v transakcii pred zmazaním, udalosti po commite.
+    // `as` – priradenie vnútri callbacku TypeScript nesleduje a inak by typ zúžil na null.
+    let expired = null as { channel: ChannelDto; audience: Audience } | null
+
     const message = await db.transaction(async (trx) => {
       const channel = await Channel.query({ client: trx })
         .where('id', channelId)
@@ -68,6 +76,11 @@ export default class MessagesController {
       // aby nová správa neoživila zaniknutý kanál. Výnimku vyhodíme až po commite,
       // inak by rollback vrátil späť aj zmazanie.
       if (ChannelExpirationService.isExpired(channel)) {
+        expired = {
+          channel: ChannelEventsService.channelDto(channel),
+          audience: await ChannelEventsService.audience(channel.id, trx),
+        }
+
         await channel.delete()
         return null
       }
@@ -108,6 +121,10 @@ export default class MessagesController {
     })
 
     if (!message) {
+      if (expired) {
+        const change = { type: 'deleted', channel: expired.channel, reason: 'expired' } as const
+        ChannelEventsService.send(ChannelEventsService.plan(change, expired.audience))
+      }
       throw new Exception('Kanál zanikol, viac ako 30 dní v ňom nebola správa', { status: 404 })
     }
 

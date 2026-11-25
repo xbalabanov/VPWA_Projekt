@@ -3,6 +3,7 @@ import { Exception } from '@adonisjs/core/exceptions'
 import ChannelAccessService from '#services/channel_access_service'
 import ChannelExpirationService from '#services/channel_expiration_service'
 import ChannelMembershipService from '#services/channel_membership_service'
+import ChannelEventsService from '#services/channel_events_service'
 import ChannelTransformer from '#transformers/channel_transformer'
 import MemberTransformer from '#transformers/member_transformer'
 import { createChannelValidator, joinChannelValidator } from '#validators/channel'
@@ -35,6 +36,12 @@ export default class ChannelsController {
     const { name, isPrivate } = await request.validateUsing(createChannelValidator)
 
     const channel = await ChannelMembershipService.createChannel(name, isPrivate ?? false, user.id)
+    // Ostatné karty tvorcu dostanú nový kanál (A7).
+    await ChannelEventsService.publish({
+      type: 'joined',
+      channel: ChannelEventsService.channelDto(channel),
+      userId: user.id,
+    })
 
     response.status(201)
     return serialize(ChannelTransformer.transform(channel))
@@ -59,6 +66,11 @@ export default class ChannelsController {
         isPrivate ?? false,
         user.id
       )
+      await ChannelEventsService.publish({
+        type: 'joined',
+        channel: ChannelEventsService.channelDto(created),
+        userId: user.id,
+      })
       response.status(201)
       return serialize(ChannelTransformer.transform(created))
     }
@@ -75,6 +87,11 @@ export default class ChannelsController {
     }
 
     await ChannelMembershipService.addMember(existing, user.id)
+    await ChannelEventsService.publish({
+      type: 'joined',
+      channel: ChannelEventsService.channelDto(existing),
+      userId: user.id,
+    })
     return serialize(ChannelTransformer.transform(existing))
   }
 
@@ -103,6 +120,12 @@ export default class ChannelsController {
     }
 
     await ChannelMembershipService.removeMember(channel.id, user.id)
+    await ChannelEventsService.publish({
+      type: 'removed',
+      channel: ChannelEventsService.channelDto(channel),
+      userId: user.id,
+      reason: 'left',
+    })
     return serialize({ deleted: false })
   }
 

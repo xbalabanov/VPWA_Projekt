@@ -5,13 +5,12 @@
 </template>
 
 <script lang="ts">
-import { Socket } from '@rlanz/socket/client';
 import { defineComponent, watch } from 'vue';
-import { API_BASE_URL } from '../services/api.ts';
+import { getSocket, onSocketConnect } from '../services/socket.ts';
 import { useChannelsStore } from '../stores/channels.ts';
 import { useMessagesStore } from '../stores/messages.ts';
 import { useUsersStore } from '../stores/users.ts';
-import type { MessageDto } from '../types/api';
+import type { MessageDto, TypingStoppedEvent, TypingUpdatedEvent } from '../types/api';
 import MessageList from '../components/MessageList.vue';
 
 export default defineComponent({
@@ -29,20 +28,41 @@ export default defineComponent({
       ([channelId, userId], _, onCleanup) => {
         if (channelId === null || userId === null) return;
 
-        const socket = new Socket({ url: new URL(API_BASE_URL).origin });
-        const channel = socket.channel(`channels/${channelId}/${userId}`);
+        // Zdieľané pripojenie (services/socket.ts) – používa ho aj osobný odber users/:id (A7).
+        const socket = getSocket();
+        const name = `channels/${channelId}/${userId}`;
+        const channel = socket.channel(name);
         let active = true;
         let connectionVersion = 0;
 
-        channel.listen<MessageDto>('message.created', (message) => {
+        const onMessage = (message: MessageDto) => {
           if (active && message.channelId === channelId) {
             messages.upsertApiMessages([message]);
+            // Odoslaním správy jej autor prestal písať (B7).
+            messages.removeDraft(channelId, message.authorId);
           }
-        });
+        };
+        // Živé drafty ostatných členov (UC11, B7).
+        const onTyping = (event: TypingUpdatedEvent) => {
+          if (active && event.channelId === channelId) {
+            messages.onRemoteDraft(channelId, event.userId, event.text);
+          }
+        };
+        const onTypingStopped = (event: TypingStoppedEvent) => {
+          if (active && event.channelId === channelId)
+            messages.removeDraft(channelId, event.userId);
+        };
+        channel
+          .listen('message.created', onMessage)
+          .listen('typing.updated', onTyping)
+          .listen('typing.stopped', onTypingStopped);
 
-        const offConnect = socket.on('connect', () => {
+        const offConnect = onSocketConnect(() => {
           const version = ++connectionVersion;
           const isCurrent = () => active && version === connectionVersion;
+
+          // Drafty z obdobia výpadku už nemusia platiť; aktuálne prídu znova.
+          messages.clearDraftsIn(channelId);
 
           void channel
             .subscribe()
@@ -52,13 +72,16 @@ export default defineComponent({
             .catch(() => undefined);
         });
 
+        // Pri prepnutí kanála odídeme iba z jeho odberu; spojenie a users/:id ostávajú.
         onCleanup(() => {
           active = false;
           offConnect();
-          socket.disconnect();
+          channel.stopListening('message.created', onMessage);
+          channel.stopListening('typing.updated', onTyping);
+          channel.stopListening('typing.stopped', onTypingStopped);
+          messages.clearDraftsIn(channelId);
+          void socket.leave(name).catch(() => undefined);
         });
-
-        void socket.connect().catch(() => undefined);
       },
       { immediate: true, flush: 'sync' },
     );

@@ -25,6 +25,17 @@ class MessageService {
     return apiRequest<MessagesPageDto>(`/channels/${channelId}/messages?${params.toString()}`);
   }
 
+  // Živý draft (UC11, B7); prázdny text = prestal som písať.
+  sendTyping(channelId: number, text: string): Promise<unknown> {
+    return apiRequest(`/channels/${channelId}/typing`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+    });
+  }
+
   sendMessage(channelId: number, content: string): Promise<MessageDto> {
     const payload: SendMessagePayload = {
       content,

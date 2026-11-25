@@ -4,9 +4,17 @@
 // store len posle poziadavku a ulozi odpoved.
 // Akcie vracaju null pri uspechu, inak text chyby, ktory UI ukaze userovi
 import { defineStore } from 'pinia';
+import { Notify } from 'quasar';
 import type { Channel, ChannelMember, Invitation, Member } from '../types/models';
+import type {
+  ChannelDeletedEvent,
+  InvitationRemovedEvent,
+  MembershipChangedEvent,
+} from '../types/api';
 import { ApiError, apiRequest, jsonBody } from '../services/api.ts';
+import { getSocket, onSocketConnect } from '../services/socket.ts';
 import { useUsersStore } from './users.ts';
+import { useMessagesStore } from './messages.ts';
 
 interface ChannelsState {
   channels: Channel[]; // iba kanaly, v ktorych som clenom
@@ -16,10 +24,27 @@ interface ChannelsState {
   membersOpen: boolean; //pravy panel so zoznamom clenov (otvori ho aj /list)
 }
 
-// Kanály, pozvánky a členov obnovujeme každé 3 s a pri návrate do okna.
-const SYNC_INTERVAL_MS = 3000;
-let syncTimer: ReturnType<typeof setInterval> | null = null;
+// Zmeny kanálov, pozvánok a členstva chodia cez osobný socket odber users/:id (A7).
+// Celý stav obnovíme iba po (opätovnom) pripojení socketu a pri návrate do okna.
 let onWindowFocus: (() => void) | null = null;
+let stopUserEvents: (() => void) | null = null;
+
+// Text notifikácie, keď som prišiel o kanál inak ako vlastnou akciou v tejto karte.
+function removalText(event: ChannelDeletedEvent): string {
+  const name = `#${event.channelName}`;
+  switch (event.reason) {
+    case 'kicked':
+      return `Bol si vyhodený z kanála ${name}`;
+    case 'revoked':
+      return `Bol si odstránený z kanála ${name}`;
+    case 'expired':
+      return `Kanál ${name} zanikol, 30 dní v ňom nebola správa`;
+    case 'deleted':
+      return `Kanál ${name} bol zrušený správcom`;
+    case 'left':
+      return `Opustil si kanál ${name}`;
+  }
+}
 
 // Text chyby pre používateľa. Server posiela slovenské hlášky (403, 404, 422).
 function errorText(error: unknown): string {
@@ -69,9 +94,16 @@ export const useChannelsStore = defineStore('channels', {
     // ---- nacitanie zo servera ----
 
     async fetchChannels(): Promise<void> {
+      const active = this.activeChannel;
       this.channels = await apiRequest<Channel[]>('/channels');
-      // aktívny kanál mohol zaniknúť alebo ma z neho vyhodili
-      if (!this.channels.some((c) => c.id === this.activeChannelId)) this.selectFirstChannel();
+      // Aktívny kanál mohol zaniknúť alebo ma z neho vyhodili (napr. počas výpadku spojenia,
+      // keď udalosť channel.deleted neprišla) – prepneme a oznámime to.
+      if (!this.channels.some((c) => c.id === this.activeChannelId)) {
+        if (active) {
+          Notify.create({ type: 'warning', message: `Kanál #${active.name} už nie je dostupný` });
+        }
+        this.selectFirstChannel();
+      }
     },
 
     async fetchInvitations(): Promise<void> {
@@ -90,7 +122,8 @@ export const useChannelsStore = defineStore('channels', {
       ];
     },
 
-    // Kanály, pozvánky a členovia aktívneho kanála naraz (po prihlásení a pri pollingu).
+    // Kanály, pozvánky a členovia aktívneho kanála naraz (po prihlásení, po pripojení socketu
+    // a pri návrate do okna).
     async refresh(): Promise<void> {
       try {
         await Promise.all([this.fetchChannels(), this.fetchInvitations()]);
@@ -103,25 +136,98 @@ export const useChannelsStore = defineStore('channels', {
     startSync(): void {
       this.stopSync();
       void this.refresh();
-      // TODO socket (B2): nahradiť udalosťami zo socketu
-      syncTimer = setInterval(() => void this.refresh(), SYNC_INTERVAL_MS);
+      this.subscribeUserEvents();
       onWindowFocus = () => void this.refresh();
       window.addEventListener('focus', onWindowFocus);
     },
 
     stopSync(): void {
-      if (syncTimer !== null) clearInterval(syncTimer);
       if (onWindowFocus) window.removeEventListener('focus', onWindowFocus);
-      syncTimer = null;
       onWindowFocus = null;
+      stopUserEvents?.();
+      stopUserEvents = null;
     },
 
-    // ---- udalosti, ktore neskor zavola socket (B2) ----
+    // Osobný odber users/:id – server ho povolí iba pre moju identitu.
+    // https://github.com/RomainLanz/socket#use-the-browser-client
+    subscribeUserEvents(): void {
+      const userId = useUsersStore().currentUserId;
+      if (userId === null) return;
+
+      const socket = getSocket();
+      const name = `users/${userId}`;
+      const channel = socket.channel(name);
+
+      const handlers = {
+        'invitation.created': (invitation: Invitation) => this.onInvitationCreated(invitation),
+        'invitation.removed': (event: InvitationRemovedEvent) => this.onInvitationRemoved(event),
+        'channel.updated': (updated: Channel) => this.onChannelUpdated(updated),
+        'channel.deleted': (event: ChannelDeletedEvent) => this.onRemovedFromChannel(event),
+        'membership.changed': (event: MembershipChangedEvent) => {
+          // Kto odišiel alebo bol vyhodený, už v kanáli nepíše (B7).
+          if (event.change !== 'joined') {
+            useMessagesStore().removeDraft(event.channelId, event.userId);
+          }
+          void this.onMembershipChanged(event.channelId);
+        },
+      };
+      channel
+        .listen('invitation.created', handlers['invitation.created'])
+        .listen('invitation.removed', handlers['invitation.removed'])
+        .listen('channel.updated', handlers['channel.updated'])
+        .listen('channel.deleted', handlers['channel.deleted'])
+        .listen('membership.changed', handlers['membership.changed']);
+
+      // Po každom pripojení (aj po výpadku): odber + zosúladenie kanálov a pozvánok,
+      // lebo udalosti počas výpadku sa stratili. Aktívny kanál, z ktorého ma medzitým
+      // odstránili, fetchChannels zatvorí – ChatPage potom odber jeho správ zruší.
+      const offConnect = onSocketConnect(() => {
+        void channel.subscribe().catch(() => undefined);
+        void this.refresh();
+      });
+
+      stopUserEvents = () => {
+        offConnect();
+        for (const [event, handler] of Object.entries(handlers)) {
+          channel.stopListening(event, handler as (data: unknown) => void);
+        }
+        void socket.leave(name).catch(() => undefined);
+      };
+    },
+
+    // ---- udalosti zo socketu (users/:id) ----
 
     // Niekto ma pozval – pozvánka sa objaví navrchu.
     onInvitationCreated(invitation: Invitation): void {
       if (!this.invitations.some((i) => i.id === invitation.id)) {
         this.invitations.unshift(invitation);
+      }
+    },
+
+    // Pozvánku som odmietol v inej karte, správca ju zrušil (/revoke) alebo kanál zanikol.
+    onInvitationRemoved(event: InvitationRemovedEvent): void {
+      this.invitations = this.invitations.filter((i) => i.id !== event.invitationId);
+    },
+
+    // Pribudol mi kanál (vytvorenie, /join alebo prijatie pozvánky – aj v inej karte).
+    onChannelUpdated(channel: Channel): void {
+      const index = this.channels.findIndex((c) => c.id === channel.id);
+      if (index === -1) this.channels.push(channel);
+      else this.channels[index] = channel;
+      this.invitations = this.invitations.filter((i) => i.channelId !== channel.id);
+    },
+
+    // Prišiel som o kanál. Ak ešte bol v zozname, nespravil som to v tejto karte – oznámime to.
+    // (Vlastný /cancel alebo /quit už kanál zo zoznamu odobral, takže notifikácia nepríde.)
+    onRemovedFromChannel(event: ChannelDeletedEvent): void {
+      const known = this.channels.find((c) => c.id === event.channelId);
+      const myAction =
+        event.reason === 'left' ||
+        (event.reason === 'deleted' && known?.adminId === useUsersStore().currentUserId);
+
+      this.onChannelDeleted(event.channelId);
+      if (known && !myAction) {
+        Notify.create({ type: 'warning', message: removalText(event) });
       }
     },
 
@@ -133,10 +239,14 @@ export const useChannelsStore = defineStore('channels', {
       if (this.activeChannelId === channelId) this.selectFirstChannel();
     },
 
-    // Zmenili sa členovia kanála – znovu ich načítame.
+    // Zmenili sa členovia kanála – znovu ich načítame (zoznam členov, /list).
     async onMembershipChanged(channelId: number): Promise<void> {
-      await this.refresh();
-      if (this.channels.some((c) => c.id === channelId)) await this.fetchMembers(channelId);
+      if (!this.channels.some((c) => c.id === channelId)) return;
+      try {
+        await this.fetchMembers(channelId);
+      } catch {
+        // medzitým ma mohli odstrániť – príde channel.deleted
+      }
     },
 
     // ---- akcie pouzivatela ----

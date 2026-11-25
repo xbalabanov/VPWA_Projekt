@@ -57,6 +57,11 @@ router
           .get('channels/:id/messages', [controllers.Messages, 'index'])
           .where('id', router.matchers.number())
 
+        // Živé drafty „X píše…“ (UC11, B7)
+        router
+          .put('channels/:id/typing', [controllers.Typing, 'update'])
+          .where('id', router.matchers.number())
+
         router
           .get('channels/:id/members', [controllers.Channels, 'members'])
           .where('id', router.matchers.number())

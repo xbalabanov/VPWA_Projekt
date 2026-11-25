@@ -16,3 +16,11 @@ export const listMessagesValidator = vine.create({
   beforeId: vine.number().withoutDecimals().range([1, 2_147_483_647]).optional(),
   limit: vine.number().withoutDecimals().range([1, 100]).optional(),
 })
+
+// Živý draft (B7): prázdny text je povolený (= prestal písať), dĺžka obmedzená ako rozumná správa.
+export const typingValidator = vine.create({
+  params: vine.object({
+    id: vine.number().withoutDecimals().range([1, 2_147_483_647]),
+  }),
+  text: vine.string().maxLength(5000).optional(),
+})

@@ -7,6 +7,11 @@ export default defineConfig({
   websocket: {
     path: '/socket',
 
+    // Heartbeat: klient, ktorý do 5 s neodpovie na ping, sa odpojí – spustí sa onLeave
+    // a jeho draft u ostatných zmizne (B7, timeout zaniknutého klienta).
+    pingInterval: '10s',
+    pingTimeout: '5s',
+
     origin: ['http://localhost:9000', 'http://127.0.0.1:9000'],
 
     middleware: [

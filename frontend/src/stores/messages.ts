@@ -8,6 +8,32 @@ import messageService from '../services/MessageService.ts';
 
 const historyRequests = new Map<number, Promise<MessagesPageDto>>();
 
+// Odosielanie vlastného draftu (UC11, B7): najviac raz za DRAFT_SEND_INTERVAL_MS na kanál,
+// aby sa nepísal request pri každom písmene. Kľúč je ID kanála.
+export const DRAFT_SEND_INTERVAL_MS = 300;
+const draftTimers = new Map<number, ReturnType<typeof setTimeout>>(); // beží interval
+const pendingDrafts = new Map<number, string>(); // posledný text z políčka
+const sentDrafts = new Map<number, string>(); // čo už server dostal
+
+// Pošle serveru posledný text kanála, ak sa od posledného odoslania zmenil.
+function flushDraft(channelId: number): void {
+  const draft = pendingDrafts.get(channelId) ?? '';
+  const previous = sentDrafts.get(channelId) ?? '';
+  if (draft === previous) return; //nic nove (aj prazdny text ked som nic nepisal)
+
+  sentDrafts.set(channelId, draft);
+  // Draft je iba doplnok - chybu (vypadok, 403 po vyhodeni) ticho ignor
+  void messageService.sendTyping(channelId, draft).catch(() => undefined);
+}
+
+// Po odhlásení nesmie čakajúci časovač poslať draft za predošlého používateľa.
+function resetDraftTimers(): void {
+  draftTimers.forEach((timer) => clearTimeout(timer));
+  draftTimers.clear();
+  pendingDrafts.clear();
+  sentDrafts.clear();
+}
+
 interface MessagesState {
   messages: Message[];
   hasMore: Record<number, boolean>;
@@ -95,6 +121,7 @@ export const useMessagesStore = defineStore('messages', {
     clearSession(): void {
       const nextVersion = this.sessionVersion + 1;
       historyRequests.clear();
+      resetDraftTimers();
       this.$reset();
       this.sessionVersion = nextVersion;
     },
@@ -200,13 +227,49 @@ export const useMessagesStore = defineStore('messages', {
       }
     },
 
-    // Prázdny text odstráni rozpísanú správu z indikátora.
+    // Môj rozpísaný text v kanáli (volá CommandLine pri každej zmene). Prázdny text = prestal
+    // som písať (odoslanie, vymazanie, príkaz, prepnutie kanála) – ten sa pošle hneď.
     setDraft(channelId: number, text: string): void {
-      const userId = useUsersStore().currentUserId;
-      if (userId === null) return;
+      const draft = text.trim() ? text : '';
+      pendingDrafts.set(channelId, draft);
 
+      // Prestal som pisat: posleme hned a zrusime cakajuce odoslanie stareho textu
+      if (draft === '') {
+        clearTimeout(draftTimers.get(channelId));
+        draftTimers.delete(channelId);
+        flushDraft(channelId);
+        return;
+      }
+
+      // Interval bezi: iba si zapamätame posledny text, odosle sa na jeho konci
+      if (draftTimers.has(channelId)) return;
+
+      // Prva zmena hned, dalsie najskor po DRAFT_SEND_INTERVAL_MS
+      flushDraft(channelId);
+      const timer = setTimeout(() => {
+        draftTimers.delete(channelId);
+        flushDraft(channelId);
+      }, DRAFT_SEND_INTERVAL_MS);
+      draftTimers.set(channelId, timer);
+    },
+
+    // ---- cudzie drafty zo socketu (typing.updated / typing.stopped) ----
+
+    // Niekto v kanáli píše: nahradí jeho predošlý draft (náhľad sa mení naživo).
+    onRemoteDraft(channelId: number, userId: number, text: string): void {
+      if (userId === useUsersStore().currentUserId) return;
+      this.removeDraft(channelId, userId);
+      this.drafts.push({ channelId, userId, text });
+    },
+
+    // Prestal písať, odoslal správu, odišiel z kanála alebo sa odpojil.
+    removeDraft(channelId: number, userId: number): void {
       this.drafts = this.drafts.filter((d) => !(d.channelId === channelId && d.userId === userId));
-      if (text.trim()) this.drafts.push({ channelId, userId, text });
+    },
+
+    // Po (opätovnom) pripojení: drafty z obdobia výpadku už nemusia platiť.
+    clearDraftsIn(channelId: number): void {
+      this.drafts = this.drafts.filter((d) => d.channelId !== channelId);
     },
 
     // Notifikácia o zmienke pre správy prijaté cez socket (UC 8).
