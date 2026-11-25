@@ -4,6 +4,7 @@
 import { defineStore } from 'pinia';
 import type { Member, User, UserStatus } from '../types/models';
 import { ApiError, apiRequest, jsonBody } from '../services/api.ts';
+import { disconnectSocket } from '../services/socket.ts';
 import { useChannelsStore } from './channels.ts';
 import { useMessagesStore } from './messages.ts';
 
@@ -122,6 +123,8 @@ export const useUsersStore = defineStore('users', {
       this.users = [];
       this.currentUserId = null;
       useChannelsStore().stopSync();
+      // Socket je overený session cookie – ďalší používateľ dostane nové pripojenie (A7).
+      disconnectSocket();
       useChannelsStore().$reset();
       useMessagesStore().clearSession();
     },

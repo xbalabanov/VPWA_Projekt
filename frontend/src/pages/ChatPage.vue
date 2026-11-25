@@ -5,9 +5,8 @@
 </template>
 
 <script lang="ts">
-import { Socket } from '@rlanz/socket/client';
 import { defineComponent, watch } from 'vue';
-import { API_BASE_URL } from '../services/api.ts';
+import { getSocket, onSocketConnect } from '../services/socket.ts';
 import { useChannelsStore } from '../stores/channels.ts';
 import { useMessagesStore } from '../stores/messages.ts';
 import { useUsersStore } from '../stores/users.ts';
@@ -29,18 +28,21 @@ export default defineComponent({
       ([channelId, userId], _, onCleanup) => {
         if (channelId === null || userId === null) return;
 
-        const socket = new Socket({ url: new URL(API_BASE_URL).origin });
-        const channel = socket.channel(`channels/${channelId}/${userId}`);
+        // Zdieľané pripojenie (services/socket.ts) – používa ho aj osobný odber users/:id (A7).
+        const socket = getSocket();
+        const name = `channels/${channelId}/${userId}`;
+        const channel = socket.channel(name);
         let active = true;
         let connectionVersion = 0;
 
-        channel.listen<MessageDto>('message.created', (message) => {
+        const onMessage = (message: MessageDto) => {
           if (active && message.channelId === channelId) {
             messages.upsertApiMessages([message]);
           }
-        });
+        };
+        channel.listen('message.created', onMessage);
 
-        const offConnect = socket.on('connect', () => {
+        const offConnect = onSocketConnect(() => {
           const version = ++connectionVersion;
           const isCurrent = () => active && version === connectionVersion;
 
@@ -52,13 +54,13 @@ export default defineComponent({
             .catch(() => undefined);
         });
 
+        // Pri prepnutí kanála odídeme iba z jeho odberu; spojenie a users/:id ostávajú.
         onCleanup(() => {
           active = false;
           offConnect();
-          socket.disconnect();
+          channel.stopListening('message.created', onMessage);
+          void socket.leave(name).catch(() => undefined);
         });
-
-        void socket.connect().catch(() => undefined);
       },
       { immediate: true, flush: 'sync' },
     );
