@@ -14,6 +14,7 @@ import type {
 import { ApiError, apiRequest, jsonBody } from '../services/api.ts';
 import { getSocket, onSocketConnect } from '../services/socket.ts';
 import { useUsersStore } from './users.ts';
+import { useMessagesStore } from './messages.ts';
 
 interface ChannelsState {
   channels: Channel[]; // iba kanaly, v ktorych som clenom
@@ -162,8 +163,13 @@ export const useChannelsStore = defineStore('channels', {
         'invitation.removed': (event: InvitationRemovedEvent) => this.onInvitationRemoved(event),
         'channel.updated': (updated: Channel) => this.onChannelUpdated(updated),
         'channel.deleted': (event: ChannelDeletedEvent) => this.onRemovedFromChannel(event),
-        'membership.changed': (event: MembershipChangedEvent) =>
-          void this.onMembershipChanged(event.channelId),
+        'membership.changed': (event: MembershipChangedEvent) => {
+          // Kto odišiel alebo bol vyhodený, už v kanáli nepíše (B7).
+          if (event.change !== 'joined') {
+            useMessagesStore().removeDraft(event.channelId, event.userId);
+          }
+          void this.onMembershipChanged(event.channelId);
+        },
       };
       channel
         .listen('invitation.created', handlers['invitation.created'])

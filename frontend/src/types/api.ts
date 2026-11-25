@@ -50,3 +50,15 @@ export interface MembershipChangedEvent {
   userId: number;
   change: 'joined' | 'left' | 'revoked' | 'kicked';
 }
+
+// ---- živé drafty na odbere kanála channels/:id/:userId (UC11, B7) ----
+export interface TypingUpdatedEvent {
+  channelId: number;
+  userId: number;
+  text: string;
+}
+
+export interface TypingStoppedEvent {
+  channelId: number;
+  userId: number;
+}
