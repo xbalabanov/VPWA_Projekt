@@ -31,4 +31,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   DB_USER: Env.schema.string(),
   DB_PASSWORD: Env.schema.string.optional(),
   DB_DATABASE: Env.schema.string(),
+
+  // Ako často server maže expirované kanály (A8), v minútach. 0 = vypnuté. Predvolene 60.
+  CHANNEL_CLEANUP_INTERVAL_MINUTES: Env.schema.number.optional(),
 })

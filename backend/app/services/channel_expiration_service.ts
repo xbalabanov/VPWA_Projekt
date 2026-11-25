@@ -1,6 +1,8 @@
-import type Channel from '#models/channel'
+import Channel from '#models/channel'
 import { DateTime } from 'luxon'
+import db from '@adonisjs/lucid/services/db'
 import ChannelMembershipService from '#services/channel_membership_service'
+import ChannelEventsService from '#services/channel_events_service'
 
 // Kanál bez novej správy dlhšie ako 30 dní zaniká (UC2).
 export const EXPIRATION_DAYS = 30
@@ -37,6 +39,59 @@ export default class ChannelExpirationService {
     //Zmazanie kanála zmaže cez ON DELETE CASCADE aj členov, pozvánky, hlasy, bany a správy
     // Členovia dostanú channel.deleted s dôvodom 'expired' (A7).
     await ChannelMembershipService.deleteChannel(channel, 'expired')
+    return true
+  }
+
+  /**
+   * Pravidelné upratovanie (A8): zmaže všetky expirované kanály aj bez prístupu používateľa
+   * a vráti ich počet. Spúšťa ho preload start/channel_cleanup.ts (server) a príkaz
+   * `node ace channels:cleanup`.
+   */
+  static async cleanupExpired(now: DateTime = DateTime.now()): Promise<number> {
+    const limit = now.minus({ days: EXPIRATION_DAYS })
+
+    // Kandidati: posledna aktivita pred hranicou. Kazdeho overime pod zamkom
+    const candidates = await Channel.query()
+      .where('last_activity_at', '<', limit.toJSDate())
+      .select('id')
+
+    let deleted = 0
+    for (const candidate of candidates) {
+      if (await this.deleteExpiredChannel(candidate.id, now)) deleted++
+    }
+    return deleted
+  }
+
+  /**
+   * Zmaže jeden kanál, ak je expirovaný, a jeho členom pošle channel.deleted (reason 'expired').
+   * Kanál zamkne a expiráciu overí znova – medzitým doň mohla prísť správa (A8, súbežnosť).
+   * Vráti true, ak kanál zmazal.
+   */
+  static async deleteExpiredChannel(
+    channelId: number,
+    now: DateTime = DateTime.now()
+  ): Promise<boolean> {
+    const removed = await db.transaction(async (trx) => {
+      // Zamok riadku kanala - odoslanie spravy zamkya ten isty riadok, takze neprebehnu naraz
+      const channel = await Channel.query({ client: trx })
+        .where('id', channelId)
+        .forUpdate()
+        .first()
+
+      // Kanal medzitym zanikol inak alebo don prisla sprava - nechame ho
+      if (!channel || !this.isExpired(channel, now)) return null
+
+      // Publikum pred zmazanim (CASCADE zmaze clenov aj pozvnaky)
+      const audience = await ChannelEventsService.audience(channel.id, trx)
+      await channel.delete()
+      return { channel: ChannelEventsService.channelDto(channel), audience }
+    })
+
+    if (!removed) return false
+
+    // Udalosti az po commite transakcie.
+    const change = { type: 'deleted', channel: removed.channel, reason: 'expired' } as const
+    ChannelEventsService.send(ChannelEventsService.plan(change, removed.audience))
     return true
   }
 }
