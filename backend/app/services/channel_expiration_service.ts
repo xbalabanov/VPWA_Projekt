@@ -35,7 +35,8 @@ export default class ChannelExpirationService {
     if (!this.isExpired(channel)) return false
 
     //Zmazanie kanála zmaže cez ON DELETE CASCADE aj členov, pozvánky, hlasy, bany a správy
-    await ChannelMembershipService.deleteChannel(channel)
+    // Členovia dostanú channel.deleted s dôvodom 'expired' (A7).
+    await ChannelMembershipService.deleteChannel(channel, 'expired')
     return true
   }
 }

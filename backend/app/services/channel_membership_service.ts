@@ -4,6 +4,7 @@ import Invitation from '#models/invitation'
 import KickVote from '#models/kick_vote'
 import { DateTime } from 'luxon'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
+import ChannelEventsService, { type DeletionReason } from '#services/channel_events_service'
 
 /**
  * Zmeny členstva v kanáli, ktoré používajú controllery kanálov a pozvánok (A3)
@@ -43,7 +44,7 @@ export default class ChannelMembershipService {
       .where('channel_id', channel.id)
       .where('invited_user_id', userId)
       .delete()
-    // udalosť pre socket (B2): membership.changed
+    // Udalosti (channel.updated, membership.changed) posiela volajúci po zápise (A7).
   }
 
   /**
@@ -67,15 +68,24 @@ export default class ChannelMembershipService {
         query.where('voter_id', userId).orWhere('target_user_id', userId)
       })
       .delete()
-    // udalosť pre socket (B2): membership.changed
+    // Udalosti posiela volajúci až po commite – removeMember môže bežať v transakcii (A7).
   }
 
   /**
    * Zruší kanál. Členstvá, pozvánky, hlasy, bany aj správy zmaže DB cez ON DELETE CASCADE,
    * takže názov je hneď voľný a história sa neprenesie.
+   * Členom pošle channel.deleted a pozvaným invitation.removed (A7).
    */
-  static async deleteChannel(channel: Channel): Promise<void> {
+  static async deleteChannel(channel: Channel, reason: DeletionReason = 'deleted'): Promise<void> {
+    //Publikum zistíme pred zmazaním - CASCADE zmaze clenstva aj pozvanky
+    const audience = await ChannelEventsService.audience(channel.id)
     await channel.delete()
-    // udalosť pre socket (B2): channel.deleted
+
+    const change = {
+      type: 'deleted',
+      channel: ChannelEventsService.channelDto(channel),
+      reason,
+    } as const
+    ChannelEventsService.send(ChannelEventsService.plan(change, audience))
   }
 }
