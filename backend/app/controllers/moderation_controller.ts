@@ -1,6 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import ChannelAccessService from '#services/channel_access_service'
 import ChannelModerationService from '#services/channel_moderation_service'
+import ChannelEventsService from '#services/channel_events_service'
 import { targetUserValidator } from '#validators/channel'
 
 /**
@@ -17,7 +18,11 @@ export default class ModerationController {
     const { nickName } = await request.validateUsing(targetUserValidator)
     const target = await ChannelModerationService.findUserOrFail(nickName)
 
-    await ChannelModerationService.invite(channel, user.id, target)
+    const invitation = await ChannelModerationService.invite(channel, user.id, target)
+    await ChannelEventsService.publish({
+      type: 'invited',
+      invitation: await ChannelEventsService.invitationDto(invitation),
+    })
 
     response.status(201)
     return serialize({ invited: target.nickName })
@@ -32,7 +37,22 @@ export default class ModerationController {
     const { nickName } = await request.validateUsing(targetUserValidator)
     const target = await ChannelModerationService.findUserOrFail(nickName)
 
-    await ChannelModerationService.revoke(channel, user.id, target)
+    const result = await ChannelModerationService.revoke(channel, user.id, target)
+    if (result.removed === 'member') {
+      await ChannelEventsService.publish({
+        type: 'removed',
+        channel: ChannelEventsService.channelDto(channel),
+        userId: target.id,
+        reason: 'revoked',
+      })
+    } else {
+      await ChannelEventsService.publish({
+        type: 'invitationRemoved',
+        invitationId: result.invitationId,
+        channelId: channel.id,
+        userId: target.id,
+      })
+    }
     return serialize({ revoked: target.nickName })
   }
 
@@ -46,6 +66,15 @@ export default class ModerationController {
     const target = await ChannelModerationService.findUserOrFail(nickName)
 
     const result = await ChannelModerationService.kick(channel, user.id, target)
+    // Hlas bez banu nemení členstvo – udalosť iba pri bane (po commite hlasovania).
+    if (result.banned) {
+      await ChannelEventsService.publish({
+        type: 'removed',
+        channel: ChannelEventsService.channelDto(channel),
+        userId: target.id,
+        reason: 'kicked',
+      })
+    }
     return serialize({ nickName: target.nickName, ...result })
   }
 }

@@ -55,7 +55,8 @@ export default defineConfig({
     () => import('#providers/api_provider'),
     {
       file: () => import('@rlanz/socket/provider'),
-      environment: ['web', 'test'],
+      // console: príkaz channels:cleanup posiela udalosti cez ChannelEventsService (A8)
+      environment: ['web', 'console', 'test'],
     },
   ],
 
@@ -71,6 +72,13 @@ export default defineConfig({
     () => import('#start/routes'),
     () => import('#start/kernel'),
     () => import('#start/validator'),
+    // Pravidelné mazanie expirovaných kanálov iba v procese HTTP servera (A8),
+    // nie v testoch ani ace príkazoch.
+    // https://docs.adonisjs.com/guides/concepts/adonisrc-file#preloads
+    {
+      file: () => import('#start/channel_cleanup'),
+      environment: ['web'],
+    },
   ],
 
   /*

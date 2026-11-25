@@ -3,6 +3,8 @@ import ChannelMember from '#models/channel_member'
 import Ban from '#models/ban'
 import ChannelExpirationService from '#services/channel_expiration_service'
 import { Exception } from '@adonisjs/core/exceptions'
+import db from '@adonisjs/lucid/services/db'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 
 /**
  * Spoločné overenie prístupu ku kanálu. Používajú ho kanálové controllery
@@ -66,6 +68,22 @@ export default class ChannelAccessService {
       throw new Exception('Nie si členom tohto kanála', { status: 403 })
     }
     return channel
+  }
+
+  /**
+   * Spustí fn v transakcii so zámkom riadku kanála (SELECT … FOR UPDATE). Zmeny členstva,
+   * banov a pozvánok v jednom kanáli sa tak vykonajú po jednej (A8, súbežné /join, /kick,
+   * /invite). Všetky zápisy vo fn musia ísť cez trx – zápis z iného spojenia by čakal na zámok.
+   * https://lucid.adonisjs.com/docs/transactions
+   */
+  static async withChannelLock<T>(
+    channelId: number,
+    fn: (trx: TransactionClientContract) => Promise<T>
+  ): Promise<T> {
+    return db.transaction(async (trx) => {
+      await Channel.query({ client: trx }).where('id', channelId).forUpdate().first()
+      return fn(trx)
+    })
   }
 
   /**
